@@ -308,31 +308,78 @@ export class MenuSystem {
     this.ctx.lineTo(w - p, h - p - cornerSize);
     this.ctx.stroke();
 
-    // 绘制四角花纹 (简化版)
-    this.drawCorner(p, p, 1, 1);           // TL
-    this.drawCorner(w - p, p, -1, 1);      // TR
-    this.drawCorner(p, h - p, 1, -1);      // BL
-    this.drawCorner(w - p, h - p, -1, -1); // BR
+    // 绘制四角花纹 (不使用scale)
+    this.drawCornerTL(p, p);           // 左上角
+    this.drawCornerTR(w - p, p);      // 右上角
+    this.drawCornerBL(p, h - p);      // 左下角
+    this.drawCornerBR(w - p, h - p); // 右下角
   }
 
-  private drawCorner(x: number, y: number, sx: number, sy: number): void {
-    this.ctx.save();
-    this.ctx.translate(x, y);
-    this.ctx.scale(sx, sy);
-    
+  // 左上角
+  private drawCornerTL(x: number, y: number): void {
     this.ctx.strokeStyle = this.colors.accent;
     this.ctx.lineWidth = 2;
+    
+    // 绘制L形折线
     this.ctx.beginPath();
-    this.ctx.moveTo(0, 25);
-    this.ctx.lineTo(0, 0);
-    this.ctx.lineTo(25, 0);
+    this.ctx.moveTo(x, y + 25);
+    this.ctx.lineTo(x, y);
+    this.ctx.lineTo(x + 25, y);
     this.ctx.stroke();
 
-    this.ctx.beginPath();
-    this.ctx.rect(4, 4, 8, 8);
+    // 绘制小方块
     this.ctx.fillStyle = this.colors.primary;
-    this.ctx.fill();
+    this.ctx.fillRect(x + 4, y + 4, 8, 8);
+  }
+
+  // 右上角
+  private drawCornerTR(x: number, y: number): void {
+    this.ctx.strokeStyle = this.colors.accent;
+    this.ctx.lineWidth = 2;
     
-    this.ctx.restore();
+    // 绘制L形折线（镜像到右侧）
+    this.ctx.beginPath();
+    this.ctx.moveTo(x, y + 25);
+    this.ctx.lineTo(x, y);
+    this.ctx.lineTo(x - 25, y);
+    this.ctx.stroke();
+
+    // 绘制小方块
+    this.ctx.fillStyle = this.colors.primary;
+    this.ctx.fillRect(x - 12, y + 4, 8, 8);
+  }
+
+  // 左下角
+  private drawCornerBL(x: number, y: number): void {
+    this.ctx.strokeStyle = this.colors.accent;
+    this.ctx.lineWidth = 2;
+    
+    // 绘制L形折线（镜像到底部）
+    this.ctx.beginPath();
+    this.ctx.moveTo(x, y - 25);
+    this.ctx.lineTo(x, y);
+    this.ctx.lineTo(x + 25, y);
+    this.ctx.stroke();
+
+    // 绘制小方块
+    this.ctx.fillStyle = this.colors.primary;
+    this.ctx.fillRect(x + 4, y - 12, 8, 8);
+  }
+
+  // 右下角
+  private drawCornerBR(x: number, y: number): void {
+    this.ctx.strokeStyle = this.colors.accent;
+    this.ctx.lineWidth = 2;
+    
+    // 绘制L形折线（镜像到右下角）
+    this.ctx.beginPath();
+    this.ctx.moveTo(x, y - 25);
+    this.ctx.lineTo(x, y);
+    this.ctx.lineTo(x - 25, y);
+    this.ctx.stroke();
+
+    // 绘制小方块
+    this.ctx.fillStyle = this.colors.primary;
+    this.ctx.fillRect(x - 12, y - 12, 8, 8);
   }
 }

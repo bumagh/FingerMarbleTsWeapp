@@ -1,6 +1,6 @@
 // src/game.ts
 import { PhysicsBody, Vector, PhysicsEngine } from "./physics";
-import { MenuSystem } from "./menu";
+import { MenuSystem, MenuState } from "./menu";
 import DataBus, { GameBall, GameObstacle } from "./databus";
 
 const canvas = wx.createCanvas();
@@ -23,7 +23,10 @@ class RetroMarbleGame {
 
   private physics: PhysicsEngine;
   private menu: MenuSystem;
-
+  
+  // 添加菜单状态变量
+  private menuState: MenuState = 'MAIN';
+  
   constructor() {
     canvas.width = databus.config.WIDTH;
     canvas.height = databus.config.HEIGHT;
@@ -33,35 +36,46 @@ class RetroMarbleGame {
     
     // 初始化菜单系统
     this.menu = new MenuSystem(ctx, canvas);
+    
+    // 立即设置菜单回调
     this.setupMenuCallbacks();
     
-    // 初始化游戏
-    this.resetGame();
+    // 绑定事件
     this.bindEvents();
     this.gameLoop();
   }
 
+  // 在 setupMenuCallbacks 方法中添加日志
   private setupMenuCallbacks(): void {
+    console.log('设置菜单回调...');
+    
     this.menu.onStart = () => {
+      console.log('onStart 回调执行');
       this.state = GameState.PLAYING;
+      this.menuState = 'NONE'; // 隐藏菜单
       this.resetGame();
     };
 
     this.menu.onRestart = () => {
+      console.log('onRestart 回调执行');
       this.state = GameState.PLAYING;
+      this.menuState = 'NONE'; // 隐藏菜单
       this.resetGame();
     };
 
     this.menu.onHelp = () => {
+      console.log('onHelp 回调执行');
       // 切换到帮助界面
-      this.state = GameState.MENU;
+      this.menuState = 'HELP';
     };
 
     this.menu.onBackToMenu = () => {
+      console.log('onBackToMenu 回调执行');
+      this.menuState = 'MAIN';
       this.state = GameState.MENU;
     };
   }
-
+  
   private resetGame(): void {
     // 重置 DataBus
     databus.reset();
@@ -200,7 +214,9 @@ class RetroMarbleGame {
   }
 
   private update(dt: number): void {
-    if (this.state === GameState.PLAYING || this.state === GameState.MOVING) {
+    // 只有在游戏进行中才更新物理
+    if (this.state === GameState.PLAYING || this.state === GameState.AIMING || 
+        this.state === GameState.MOVING || this.state === GameState.SETTLING) {
       // 合并所有游戏对象用于物理更新
       const allBodies: PhysicsBody[] = [
         ...databus.balls,
@@ -284,31 +300,31 @@ class RetroMarbleGame {
       this.turnTimer = databus.config.TURN_TIME;
     }
   }
-
+  
   private handleWin(): void {
     databus.addExp(20);
     
     this.state = GameState.GAME_OVER;
+    this.menuState = 'GAME_OVER';
     this.menu.showGameOver(true, `捕获成功！经验+20 (等级${databus.playerGrade})`);
   }
-
+  
   private handleLose(): void {
     this.state = GameState.GAME_OVER;
+    this.menuState = 'GAME_OVER';
     this.menu.showGameOver(false, "你的弹珠被捕获了！");
   }
-
+  
   private render(): void {
     // 清空画布
     ctx.clearRect(0, 0, databus.config.WIDTH, databus.config.HEIGHT);
     
-    // 根据状态渲染
-    if (this.state === GameState.MENU) {
-      this.menu.render('MAIN');
-    } else if (this.state === GameState.GAME_OVER) {
-      this.menu.render('GAME_OVER');
-    } else {
-      // 游戏进行中，渲染游戏画面
-      this.renderGame();
+    // 首先渲染游戏场景（无论什么状态都渲染背景和游戏元素）
+    this.renderGame();
+    
+    // 然后在顶部渲染菜单（如果有）
+    if (this.menuState !== 'NONE') {
+      this.menu.render(this.menuState);
     }
   }
 
@@ -401,23 +417,25 @@ class RetroMarbleGame {
       }
     }
     
-    // 绘制UI
-    ctx.fillStyle = '#ecf0f1';
-    ctx.font = '16px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText(`等级: ${databus.playerGrade}`, 20, 30);
-    ctx.fillText(`经验: ${databus.playerExp}/100`, 20, 55);
-    ctx.fillText(`积分: ${databus.score}`, 20, 80);
-    ctx.fillText(`回合: ${this.turn === Turn.PLAYER ? '玩家' : 'AI'}`, 20, 105);
-    ctx.fillText(`时间: ${Math.max(0, this.turnTimer).toFixed(1)}s`, 20, 130);
-    
-    // 显示下注金额
-    if (databus.betAmount > 0) {
-      ctx.fillText(`下注: ${databus.betAmount}`, 20, 155);
+    // 绘制UI - 只在游戏进行中显示
+    if (this.state !== GameState.MENU && this.state !== GameState.GAME_OVER) {
+      ctx.fillStyle = '#ecf0f1';
+      ctx.font = '16px Arial';
+      ctx.textAlign = 'left';
+      ctx.fillText(`等级: ${databus.playerGrade}`, 20, 30);
+      ctx.fillText(`经验: ${databus.playerExp}/100`, 20, 55);
+      ctx.fillText(`积分: ${databus.score}`, 20, 80);
+      ctx.fillText(`回合: ${this.turn === Turn.PLAYER ? '玩家' : 'AI'}`, 20, 105);
+      ctx.fillText(`时间: ${Math.max(0, this.turnTimer).toFixed(1)}s`, 20, 130);
+      
+      // 显示下注金额
+      if (databus.betAmount > 0) {
+        ctx.fillText(`下注: ${databus.betAmount}`, 20, 155);
+      }
+      
+      // 显示一扎距离
+      ctx.fillText(`一扎: ${databus.handSpan}px`, 20, 180);
     }
-    
-    // 显示一扎距离
-    ctx.fillText(`一扎: ${databus.handSpan}px`, 20, 180);
   }
 
   private lastTime: number = 0;
@@ -454,9 +472,21 @@ class RetroMarbleGame {
    */
   public togglePause(): void {
     if (this.state === GameState.PLAYING) {
+      this.menuState = 'MAIN';
       this.state = GameState.MENU;
     } else if (this.state === GameState.MENU) {
+      this.menuState = 'NONE';
       this.state = GameState.PLAYING;
+    }
+  }
+
+  /**
+   * 设置菜单状态
+   */
+  public setMenuState(state: MenuState): void {
+    this.menuState = state;
+    if (state !== 'NONE') {
+      this.state = GameState.MENU;
     }
   }
 }
