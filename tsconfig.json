@@ -7,20 +7,20 @@
     ],
     "module": "commonjs",
     "outDir": "./src",
-    "rootDir": "./",
+    "rootDir": "./src",
     "strict": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
   "include": [
-    "src/**/*",
-    "game.ts"
+    "src/**/*"
   ],
   "exclude": [
     "node_modules",
     "assets",
     "js",
-    "src/**/*.js"
+    "src/**/*.js",
+    "game.js"
   ]
 }

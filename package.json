@@ -35,6 +35,7 @@
     "LICENSE",
     "index.d.ts",
     "typings.json",
-    "types/"
+    "types/",
+    "src/"
   ]
 }

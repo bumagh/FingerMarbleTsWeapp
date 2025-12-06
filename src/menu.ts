@@ -1,10 +1,5 @@
-// retro-marble-game-040926/frontend/public/src/menu.ts
-
-/**
- * Menu System Module
- * Handles all UI rendering and interactions for game menus within the Canvas
- * 遵循优雅复古风格：Baskerville字体、红棕色调
- */
+// src/menu.ts
+import { Vector } from "./physics";
 
 export type MenuState = 'MAIN' | 'HELP' | 'GAME_OVER' | 'NONE';
 
@@ -20,16 +15,19 @@ interface Button {
 
 export class MenuSystem {
   private ctx: CanvasRenderingContext2D;
+  private canvas: HTMLCanvasElement;
   private width: number;
   private height: number;
   private buttons: Button[] = [];
-  public state: MenuState = 'MAIN';
+  private gameOverInfo: { win: boolean; message: string } | null = null;
 
-  // 事件回调
+  // 事件回调（在game.ts中会设置这些回调）
   public onStart: (() => void) | null = null;
   public onRestart: (() => void) | null = null;
+  public onHelp: (() => void) | null = null;
+  public onBackToMenu: (() => void) | null = null;
 
-  // 风格常量 (与 style.css 保持一致)
+  // 风格常量 (微信小游戏环境使用通用字体)
   private readonly colors = {
     primary: '#B22222',   // 复古红棕
     secondary: '#FAEBD7', // 古董白
@@ -38,11 +36,13 @@ export class MenuSystem {
     highlight: 'rgba(178, 34, 34, 0.1)'
   };
 
-  constructor(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  // 修改构造函数以匹配game.ts中的调用
+  constructor(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
     this.ctx = ctx;
-    this.width = width;
-    this.height = height;
-    this.setupMainMenu();
+    this.canvas = canvas;
+    this.width = canvas.width;
+    this.height = canvas.height;
+    this.showMainMenu();
   }
 
   // 响应窗口大小变化
@@ -53,26 +53,25 @@ export class MenuSystem {
   }
 
   private refreshLayout(): void {
-    if (this.state === 'MAIN') this.setupMainMenu();
-    else if (this.state === 'HELP') this.setupHelpMenu();
-    else if (this.state === 'GAME_OVER') {
-        // 保持当前按钮状态，仅重新计算位置（如果需要更复杂的重排，需保存上一次的gameOver状态参数）
-        // 这里简化处理：若在resize时处于结束界面，暂不强制重绘按钮，依赖下一次调用 showGameOver
+    if (this.gameOverInfo) {
+      this.setupGameOverMenu(this.gameOverInfo.win);
+    } else {
+      this.showMainMenu();
     }
   }
 
-  // 主渲染循环调用
-  public render(scoreInfo?: { win: boolean; message: string; score?: number }): void {
-    if (this.state === 'NONE') return;
+  // 主渲染循环调用 - 修改为接收状态参数
+  public render(state: MenuState): void {
+    if (state === 'NONE') return;
 
     this.ctx.save();
     
     // 绘制背景 (全屏或半透明遮罩)
-    if (this.state === 'MAIN' || this.state === 'HELP') {
+    if (state === 'MAIN' || state === 'HELP') {
       this.ctx.fillStyle = this.colors.secondary;
       this.ctx.fillRect(0, 0, this.width, this.height);
       this.drawOrnamentalBorder();
-    } else {
+    } else if (state === 'GAME_OVER') {
       // 游戏结束时的弹窗背景
       this.ctx.fillStyle = 'rgba(250, 235, 215, 0.92)';
       this.ctx.fillRect(this.width * 0.1, this.height * 0.2, this.width * 0.8, this.height * 0.6);
@@ -82,16 +81,16 @@ export class MenuSystem {
     }
 
     // 绘制标题和文本
-    if (this.state === 'MAIN') {
-      this.drawTitle("MARBLE DUEL", 0.3);
-      this.drawSubtitle("A Schoolyard Tactical Game", 0.38);
-    } else if (this.state === 'HELP') {
-      this.drawTitle("INSTRUCTIONS", 0.25);
+    if (state === 'MAIN') {
+      this.drawTitle("弹珠对决", 0.3);
+      this.drawSubtitle("校园弹珠战术游戏", 0.38);
+    } else if (state === 'HELP') {
+      this.drawTitle("游戏说明", 0.25);
       this.drawHelpText();
-    } else if (this.state === 'GAME_OVER' && scoreInfo) {
+    } else if (state === 'GAME_OVER' && this.gameOverInfo) {
       const titleY = 0.35;
-      this.drawTitle(scoreInfo.win ? "VICTORY!" : "DEFEAT", titleY);
-      this.drawSubtitle(scoreInfo.message, titleY + 0.08);
+      this.drawTitle(this.gameOverInfo.win ? "胜利！" : "失败！", titleY);
+      this.drawSubtitle(this.gameOverInfo.message, titleY + 0.08);
     }
 
     // 绘制所有按钮
@@ -102,10 +101,8 @@ export class MenuSystem {
 
   // 处理输入事件
   public handleInput(x: number, y: number): boolean {
-    if (this.state === 'NONE') return false;
-
     let handled = false;
-    // 倒序检测，确保覆盖在上面的元素优先响应（虽然目前没有重叠）
+    // 倒序检测，确保覆盖在上面的元素优先响应
     for (let i = this.buttons.length - 1; i >= 0; i--) {
       const btn = this.buttons[i];
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
@@ -114,19 +111,24 @@ export class MenuSystem {
         break;
       }
     }
-    // 如果菜单处于开启状态，总是拦截点击，防止穿透到游戏层
-    return true; 
+    return handled;
   }
 
   // 切换到主菜单
   public showMainMenu(): void {
-    this.state = 'MAIN';
+    this.gameOverInfo = null;
     this.setupMainMenu();
+  }
+
+  // 切换到帮助界面
+  public showHelpMenu(): void {
+    this.gameOverInfo = null;
+    this.setupHelpMenu();
   }
 
   // 切换到游戏结束界面
   public showGameOver(win: boolean, message: string): void {
-    this.state = 'GAME_OVER';
+    this.gameOverInfo = { win, message };
     this.setupGameOverMenu(win);
   }
 
@@ -140,14 +142,13 @@ export class MenuSystem {
     const startY = this.height * 0.55;
     const gap = 25;
 
-    this.addButton("start_game", "START GAME", centerX, startY, btnW, btnH, () => {
-      this.state = 'NONE';
+    this.addButton("start_game", "开始游戏", centerX, startY, btnW, btnH, () => {
       if (this.onStart) this.onStart();
     });
 
-    this.addButton("help", "HOW TO PLAY", centerX, startY + btnH + gap, btnW, btnH, () => {
-      this.state = 'HELP';
-      this.setupHelpMenu();
+    this.addButton("help", "游戏说明", centerX, startY + btnH + gap, btnW, btnH, () => {
+      this.showHelpMenu();
+      if (this.onHelp) this.onHelp();
     });
   }
 
@@ -157,8 +158,9 @@ export class MenuSystem {
     const btnH = 50;
     
     // 底部返回按钮
-    this.addButton("back", "BACK", (this.width - btnW) / 2, this.height - 80, btnW, btnH, () => {
+    this.addButton("back", "返回", (this.width - btnW) / 2, this.height - 80, btnW, btnH, () => {
       this.showMainMenu();
+      if (this.onBackToMenu) this.onBackToMenu();
     });
   }
 
@@ -170,15 +172,15 @@ export class MenuSystem {
     const startY = this.height * 0.55;
     const gap = 20;
 
-    const actionText = win ? "NEXT LEVEL" : "TRY AGAIN";
+    const actionText = win ? "下一关" : "再试一次";
     
     this.addButton("restart", actionText, centerX, startY, btnW, btnH, () => {
-      this.state = 'NONE';
       if (this.onRestart) this.onRestart();
     });
 
-    this.addButton("home", "MAIN MENU", centerX, startY + btnH + gap, btnW, btnH, () => {
+    this.addButton("home", "主菜单", centerX, startY + btnH + gap, btnW, btnH, () => {
       this.showMainMenu();
+      if (this.onBackToMenu) this.onBackToMenu();
     });
   }
 
@@ -189,7 +191,8 @@ export class MenuSystem {
   // --- 绘图辅助方法 ---
 
   private drawTitle(text: string, yRatio: number): void {
-    this.ctx.font = "bold 42px 'Cinzel', 'Baskerville', serif";
+    // 微信小游戏使用通用字体，调整为适合中文字体
+    this.ctx.font = "bold 36px 'Arial', 'Microsoft YaHei', sans-serif";
     this.ctx.fillStyle = this.colors.primary;
     this.ctx.textAlign = "center";
     this.ctx.textBaseline = "middle";
@@ -206,7 +209,7 @@ export class MenuSystem {
   }
 
   private drawSubtitle(text: string, yRatio: number): void {
-    this.ctx.font = "italic 20px 'Baskerville', serif";
+    this.ctx.font = "italic 18px 'Arial', 'Microsoft YaHei', sans-serif";
     this.ctx.fillStyle = this.colors.text;
     this.ctx.textAlign = "center";
     this.ctx.fillText(text, this.width / 2, this.height * yRatio);
@@ -214,20 +217,20 @@ export class MenuSystem {
 
   private drawHelpText(): void {
     const lines = [
-      "MISSION:",
-      "Launch your marble to land near the enemy.",
-      "Capture range: Within one 'Hand Span'.",
+      "游戏目标:",
+      "将你的弹珠发射到敌人弹珠附近。",
+      "捕获范围：在一扎距离内。",
       "",
-      "CONTROLS:",
-      "Drag back to aim and power up.",
-      "Release to shoot.",
+      "操作方法:",
+      "向后拖拽以瞄准和蓄力。",
+      "松开手指进行发射。",
       "",
-      "RULES:",
-      "Turn-based gameplay.",
-      "Don't fall off the edge!"
+      "游戏规则:",
+      "回合制游戏。",
+      "不要掉出边界！"
     ];
 
-    this.ctx.font = "16px 'Baskerville', serif";
+    this.ctx.font = "16px 'Arial', 'Microsoft YaHei', sans-serif";
     this.ctx.fillStyle = this.colors.text;
     this.ctx.textAlign = "center";
     let y = this.height * 0.35;
@@ -236,10 +239,10 @@ export class MenuSystem {
     lines.forEach(line => {
       // 简单的加粗标题检测
       if (line.endsWith(':')) {
-         this.ctx.font = "bold 17px 'Baskerville', serif";
+         this.ctx.font = "bold 17px 'Arial', 'Microsoft YaHei', sans-serif";
          this.ctx.fillStyle = this.colors.accent;
       } else {
-         this.ctx.font = "16px 'Baskerville', serif";
+         this.ctx.font = "16px 'Arial', 'Microsoft YaHei', sans-serif";
          this.ctx.fillStyle = this.colors.text;
       }
       this.ctx.fillText(line, this.width / 2, y);
@@ -266,7 +269,7 @@ export class MenuSystem {
     this.ctx.strokeRect(btn.x + 4, btn.y + 4, btn.w - 8, btn.h - 8);
 
     // 文字
-    this.ctx.font = "bold 18px 'Baskerville', serif";
+    this.ctx.font = "bold 18px 'Arial', 'Microsoft YaHei', sans-serif";
     this.ctx.fillStyle = this.colors.primary;
     this.ctx.textAlign = "center";
     this.ctx.textBaseline = "middle";
