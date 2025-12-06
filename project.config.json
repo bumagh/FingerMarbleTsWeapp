@@ -54,5 +54,8 @@
     "include": []
   },
   "isGameTourist": false,
-  "editorSetting": {}
+  "editorSetting": {},
+  "scripts": {
+    "beforeCompile": "npm run build"
+  }
 }

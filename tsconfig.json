@@ -6,17 +6,21 @@
       "dom"
     ],
     "module": "commonjs",
-    "outDir": "./dist",
+    "outDir": "./src",
     "rootDir": "./",
     "strict": false,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   },
   "include": [
-    "./game.ts"
+    "src/**/*",
+    "game.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "assets",
+    "js",
+    "src/**/*.js"
   ]
 }
