@@ -3,7 +3,9 @@ import { Vector } from "./physics";
 import { MenuSystem, MenuState } from "./menu";
 import DataBus from "./databus";
 import RetroMarbleGame from "./game";
-
+// 游戏状态枚举
+enum GameState { MENU, PLAYING, AIMING, MOVING, SETTLING, GAME_OVER }
+enum Turn { PLAYER, AI }
 /**
  * 游戏事件管理器
  * 负责处理所有UI交互和游戏事件
@@ -12,14 +14,14 @@ export default class EventManager {
   private main: RetroMarbleGame;
   private databus: typeof DataBus;
   private menu: MenuSystem;
-  private canvas: HTMLCanvasElement;
-  
+  private canvas: WechatMinigame.Canvas;
+
   // 拖拽相关状态
   private isDragging: boolean = false;
   private dragStart: Vector | null = null;
   private dragEnd: Vector | null = null;
 
-  constructor(mainInstance: RetroMarbleGame, canvas: HTMLCanvasElement, menu: MenuSystem) {
+  constructor(mainInstance: RetroMarbleGame, canvas: WechatMinigame.Canvas, menu: MenuSystem) {
     this.main = mainInstance;
     this.databus = DataBus;
     this.menu = menu;
@@ -36,7 +38,7 @@ export default class EventManager {
    */
   public init(): void {
     console.log('事件管理器初始化...');
-    
+
     // 绑定事件监听器
     wx.onTouchStart(this.handleTouchStart);
     wx.onTouchMove(this.handleTouchMove);
@@ -54,13 +56,14 @@ export default class EventManager {
   private setupMenuCallbacks(): void {
     this.menu.onStart = () => {
       console.log('开始游戏');
-      this.main.setState('PLAYING');
+      this.main.setState(GameState.PLAYING);
       this.main.resetGame();
+      this.main.setMenuState('NONE');
     };
 
     this.menu.onRestart = () => {
       console.log('重新开始');
-      this.main.setState('PLAYING');
+      this.main.setState(GameState.PLAYING);
       this.main.resetGame();
     };
 
@@ -94,7 +97,7 @@ export default class EventManager {
     }
 
     // 处理游戏中的触摸事件
-    if (gameState === 'PLAYING' || gameState === 'AIMING') {
+    if (gameState === GameState.PLAYING || gameState === GameState.AIMING) {
       this.handleGameTouchStart(x, y);
     }
   }
@@ -107,7 +110,7 @@ export default class EventManager {
     const turn = this.main.getTurn();
 
     // 只有在玩家回合且游戏进行中时才能拖拽
-    if (gameState !== 'PLAYING' || turn !== 'PLAYER') return;
+    if (gameState !== GameState.PLAYING || turn !== Turn.PLAYER) return;
 
     const player = this.databus.getPlayerBall();
     if (!player) return;
@@ -118,9 +121,9 @@ export default class EventManager {
       this.isDragging = true;
       this.dragStart = { x: player.x, y: player.y };
       this.dragEnd = { x, y };
-      
+
       // 切换到瞄准状态
-      this.main.setState('AIMING');
+      this.main.setState(GameState.AIMING);
     }
   }
 
@@ -129,7 +132,7 @@ export default class EventManager {
    */
   private handleTouchMove(e: any): void {
     if (!this.isDragging) return;
-    
+
     const touch = e.touches[0];
     this.dragEnd = { x: touch.clientX, y: touch.clientY };
   }
@@ -139,7 +142,7 @@ export default class EventManager {
    */
   private handleTouchEnd(): void {
     if (!this.isDragging) return;
-    
+
     this.handleGameTouchEnd();
     this.resetDragState();
   }
@@ -169,12 +172,12 @@ export default class EventManager {
       player.vy = Math.sin(angle) * force * 0.1;
 
       // 切换到移动状态并重置回合计时器
-      this.main.setState('MOVING');
+      this.main.setState(GameState.MOVING);
       this.main.resetTurnTimer();
     }
 
     // 返回游戏状态
-    this.main.setState('PLAYING');
+    this.main.setState(GameState.PLAYING);
   }
 
   /**
@@ -207,28 +210,28 @@ export default class EventManager {
   public executeAITurn(): void {
     const enemy = this.databus.getEnemyBall();
     const player = this.databus.getPlayerBall();
-    
+
     if (!enemy || !player) return;
-    
+
     // 计算到玩家弹珠的方向和距离
     const dx = player.x - enemy.x;
     const dy = player.y - enemy.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    
+
     // 计算发射力量（随距离增加，但有上限）
     const force = Math.min(600, dist * 1.5);
     const angle = Math.atan2(dy, dx);
-    
+
     // 添加一些随机误差，使AI不那么完美
     const error = (Math.random() - 0.5) * 0.3;
     const finalAngle = angle + error;
-    
+
     // 应用力量到敌人弹珠
     enemy.vx = Math.cos(finalAngle) * force * 0.1;
     enemy.vy = Math.sin(finalAngle) * force * 0.1;
-    
+
     // 切换到移动状态并重置回合计时器
-    this.main.setState('MOVING');
+    this.main.setState(GameState.MOVING);
     this.main.resetTurnTimer();
   }
 
@@ -256,12 +259,12 @@ export default class EventManager {
     const gameState = this.main.getState();
     const menuState = this.main.getMenuState();
 
-    if (gameState === 'PLAYING' || gameState === 'MOVING' || gameState === 'SETTLING') {
+    if (gameState === GameState.PLAYING || gameState === GameState.MOVING || gameState === GameState.SETTLING) {
       this.main.setMenuState('MAIN');
-      this.main.setState('MENU');
-    } else if (menuState === 'MAIN' && gameState === 'MENU') {
+      this.main.setState(GameState.MENU);
+    } else if (menuState === 'MAIN' && gameState === GameState.MENU) {
       this.main.setMenuState('NONE');
-      this.main.setState('PLAYING');
+      this.main.setState(GameState.PLAYING);
     }
   }
 
@@ -271,16 +274,16 @@ export default class EventManager {
   public settleRound(): void {
     const player = this.databus.getPlayerBall();
     const enemy = this.databus.getEnemyBall();
-    
+
     if (!player || !enemy) return;
-    
+
     // 检查是否在"一扎"距离内
     const physics = this.main.getPhysicsEngine();
     const isCaptured = physics.checkDistance(player, enemy, this.databus.handSpan);
-    
+
     if (isCaptured) {
       const turn = this.main.getTurn();
-      if (turn === 'PLAYER') {
+      if (turn === Turn.PLAYER) {
         this.handleWin();
       } else {
         this.handleLose();
@@ -288,7 +291,7 @@ export default class EventManager {
     } else {
       // 切换回合
       this.main.switchTurn();
-      this.main.setState('PLAYING');
+      this.main.setState(GameState.PLAYING);
       this.main.resetTurnTimer();
     }
   }

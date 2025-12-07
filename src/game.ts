@@ -44,7 +44,7 @@ class RetroMarbleGame {
     this.gameLoop();
   }
   
-  private resetGame(): void {
+  public resetGame(): void {
     // 重置 DataBus
     databus.reset();
     var info = getScreenInfo();
@@ -161,9 +161,10 @@ class RetroMarbleGame {
     this.renderGame();
     
     // 然后在顶部渲染菜单（如果有）
-    if (this.menuState !== 'NONE') {
-      this.menu.render(this.menuState);
-    }
+  // 渲染菜单（如果需要）
+  if (this.state === GameState.MENU || this.state === GameState.GAME_OVER) {
+    this.menu.render(this.menuState);
+  }
   }
 
   private renderGame(): void {

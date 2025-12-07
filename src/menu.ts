@@ -15,7 +15,7 @@ interface Button {
 
 export class MenuSystem {
   private ctx: CanvasRenderingContext2D;
-  private canvas: HTMLCanvasElement;
+  private canvas: WechatMinigame.Canvas;
   private width: number;
   private height: number;
   private buttons: Button[] = [];
@@ -37,7 +37,7 @@ export class MenuSystem {
   };
 
   // 修改构造函数以匹配game.ts中的调用
-  constructor(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+  constructor(ctx: CanvasRenderingContext2D, canvas: WechatMinigame.Canvas) {
     this.ctx = ctx;
     this.canvas = canvas;
     this.width = canvas.width;

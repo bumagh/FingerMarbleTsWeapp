@@ -5,6 +5,8 @@
       "es2015",
       "dom"
     ],
+    "typeRoots": ["./types", "./node_modules/@types"],
+    "types": ["wx"],
     "module": "commonjs",
     "outDir": "./src",
     "rootDir": "./src",

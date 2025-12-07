@@ -8,7 +8,7 @@ declare global
     interface GameGlobal
     {
         globalData: any;
-        canvas?: HTMLCanvasElement;
+        canvas?: WechatMinigame.Canvas;
         context?: CanvasRenderingContext2D;
         [ key: string ]: any;
     }
