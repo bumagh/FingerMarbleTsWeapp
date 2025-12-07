@@ -1,15 +1,17 @@
 // src/game.ts
-import { PhysicsBody, Vector, PhysicsEngine } from "./physics";
+import { PhysicsBody, PhysicsEngine } from "./physics";
 import { MenuSystem, MenuState } from "./menu";
 import DataBus, { GameBall, GameObstacle } from "./databus";
+import EventManager from "./eventmanager";
+import { getScreenInfo } from "./screen";
 
 const canvas = wx.createCanvas();
-const ctx = canvas.getContext('2d')!;
+const ctx = canvas.getContext('2d');
 
 // 获取 DataBus 实例
 const databus = DataBus;
 
-// 游戏状态枚举（部分状态已移到 DataBus 中）
+// 游戏状态枚举
 enum GameState { MENU, PLAYING, AIMING, MOVING, SETTLING, GAME_OVER }
 enum Turn { PLAYER, AI }
 
@@ -17,19 +19,15 @@ class RetroMarbleGame {
   private state: GameState = GameState.MENU;
   private turn: Turn = Turn.PLAYER;
   private turnTimer: number = databus.config.TURN_TIME;
-  private isDragging: boolean = false;
-  private dragStart: Vector | null = null;
-  private dragEnd: Vector | null = null;
-
+  
   private physics: PhysicsEngine;
   private menu: MenuSystem;
+  private eventManager: EventManager;
   
   // 添加菜单状态变量
   private menuState: MenuState = 'MAIN';
   
   constructor() {
-    canvas.width = databus.config.WIDTH;
-    canvas.height = databus.config.HEIGHT;
     
     // 初始化物理引擎
     this.physics = new PhysicsEngine(databus.config.WIDTH, databus.config.HEIGHT);
@@ -37,55 +35,23 @@ class RetroMarbleGame {
     // 初始化菜单系统
     this.menu = new MenuSystem(ctx, canvas);
     
-    // 立即设置菜单回调
-    this.setupMenuCallbacks();
+    // 初始化事件管理器
+    this.eventManager = new EventManager(this, canvas, this.menu);
+    this.eventManager.init();
     
-    // 绑定事件
-    this.bindEvents();
+    // 初始化游戏
+    this.resetGame();
     this.gameLoop();
-  }
-
-  // 在 setupMenuCallbacks 方法中添加日志
-  private setupMenuCallbacks(): void {
-    console.log('设置菜单回调...');
-    
-    this.menu.onStart = () => {
-      console.log('onStart 回调执行');
-      this.state = GameState.PLAYING;
-      this.menuState = 'NONE'; // 隐藏菜单
-      this.resetGame();
-    };
-
-    this.menu.onRestart = () => {
-      console.log('onRestart 回调执行');
-      this.state = GameState.PLAYING;
-      this.menuState = 'NONE'; // 隐藏菜单
-      this.resetGame();
-    };
-
-    this.menu.onHelp = () => {
-      console.log('onHelp 回调执行');
-      // 切换到帮助界面
-      this.menuState = 'HELP';
-    };
-
-    this.menu.onBackToMenu = () => {
-      console.log('onBackToMenu 回调执行');
-      this.menuState = 'MAIN';
-      this.state = GameState.MENU;
-    };
   }
   
   private resetGame(): void {
     // 重置 DataBus
     databus.reset();
-    
+    var info = getScreenInfo();
+    databus.initConfig(info.width,info.height);
     // 重置游戏状态
     this.turn = Math.random() > 0.5 ? Turn.PLAYER : Turn.AI;
     this.turnTimer = databus.config.TURN_TIME;
-    this.isDragging = false;
-    this.dragStart = null;
-    this.dragEnd = null;
 
     // 创建玩家弹珠
     const playerBall = databus.createBall(
@@ -145,74 +111,6 @@ class RetroMarbleGame {
     }
   }
 
-  private bindEvents(): void {
-    wx.onTouchStart((e) => {
-      const touch = e.touches[0];
-      this.handleTouchStart(touch.clientX, touch.clientY);
-    });
-
-    wx.onTouchMove((e) => {
-      if (!this.isDragging) return;
-      const touch = e.touches[0];
-      this.dragEnd = { x: touch.clientX, y: touch.clientY };
-    });
-
-    wx.onTouchEnd(() => {
-      if (this.isDragging) {
-        this.handleTouchEnd();
-      }
-    });
-  }
-
-  private handleTouchStart(x: number, y: number): void {
-    // 如果处于菜单状态，将事件传递给菜单系统
-    if (this.state === GameState.MENU || this.state === GameState.GAME_OVER) {
-      const handled = this.menu.handleInput(x, y);
-      if (handled) return;
-    }
-
-    if (this.state !== GameState.PLAYING || this.turn !== Turn.PLAYER) return;
-
-    const player = databus.getPlayerBall();
-    if (!player) return;
-
-    const dist = Math.sqrt((x - player.x) ** 2 + (y - player.y) ** 2);
-    if (dist < player.radius * 2) {
-      this.isDragging = true;
-      this.dragStart = { x: player.x, y: player.y };
-      this.dragEnd = { x, y };
-      this.state = GameState.AIMING;
-    }
-  }
-
-  private handleTouchEnd(): void {
-    if (!this.isDragging || !this.dragStart || !this.dragEnd) return;
-
-    const player = databus.getPlayerBall();
-    if (!player) return;
-
-    const dx = this.dragStart.x - this.dragEnd.x;
-    const dy = this.dragStart.y - this.dragEnd.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist > 15) {
-      const power = Math.min(dist, 200) / 200;
-      const force = power * databus.maxForce;
-      const angle = Math.atan2(dy, dx);
-
-      player.vx = Math.cos(angle) * force * 0.1;
-      player.vy = Math.sin(angle) * force * 0.1;
-
-      this.state = GameState.MOVING;
-      this.turnTimer = databus.config.TURN_TIME;
-    }
-
-    this.isDragging = false;
-    this.dragStart = null;
-    this.dragEnd = null;
-    this.state = GameState.PLAYING;
-  }
-
   private update(dt: number): void {
     // 只有在游戏进行中才更新物理
     if (this.state === GameState.PLAYING || this.state === GameState.AIMING || 
@@ -242,7 +140,7 @@ class RetroMarbleGame {
       
       if (this.state === GameState.MOVING && !isMoving) {
         this.state = GameState.SETTLING;
-        setTimeout(() => this.settleRound(), 600);
+        setTimeout(() => this.eventManager.settleRound(), 600);
       }
     }
     
@@ -250,69 +148,9 @@ class RetroMarbleGame {
     if (this.state === GameState.PLAYING && this.turn === Turn.AI) {
       this.turnTimer -= dt;
       if (this.turnTimer <= 0) {
-        this.executeAITurn();
+        this.eventManager.executeAITurn();
       }
     }
-  }
-
-  private executeAITurn(): void {
-    const enemy = databus.getEnemyBall();
-    const player = databus.getPlayerBall();
-    
-    if (!enemy || !player) return;
-    
-    const dx = player.x - enemy.x;
-    const dy = player.y - enemy.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    
-    const force = Math.min(600, dist * 1.5);
-    const angle = Math.atan2(dy, dx);
-    
-    const error = (Math.random() - 0.5) * 0.3;
-    const finalAngle = angle + error;
-    
-    enemy.vx = Math.cos(finalAngle) * force * 0.1;
-    enemy.vy = Math.sin(finalAngle) * force * 0.1;
-    
-    this.state = GameState.MOVING;
-    this.turnTimer = databus.config.TURN_TIME;
-  }
-
-  private settleRound(): void {
-    const player = databus.getPlayerBall();
-    const enemy = databus.getEnemyBall();
-    
-    if (!player || !enemy) return;
-    
-    // 使用物理引擎的checkDistance方法检测"一扎"距离
-    const isCaptured = this.physics.checkDistance(player, enemy, databus.handSpan);
-    
-    if (isCaptured) {
-      if (this.turn === Turn.PLAYER) {
-        this.handleWin();
-      } else {
-        this.handleLose();
-      }
-    } else {
-      // 切换回合
-      this.turn = this.turn === Turn.PLAYER ? Turn.AI : Turn.PLAYER;
-      this.state = GameState.PLAYING;
-      this.turnTimer = databus.config.TURN_TIME;
-    }
-  }
-  
-  private handleWin(): void {
-    databus.addExp(20);
-    
-    this.state = GameState.GAME_OVER;
-    this.menuState = 'GAME_OVER';
-    this.menu.showGameOver(true, `捕获成功！经验+20 (等级${databus.playerGrade})`);
-  }
-  
-  private handleLose(): void {
-    this.state = GameState.GAME_OVER;
-    this.menuState = 'GAME_OVER';
-    this.menu.showGameOver(false, "你的弹珠被捕获了！");
   }
   
   private render(): void {
@@ -377,23 +215,24 @@ class RetroMarbleGame {
       ctx.restore();
     });
     
-    // 绘制拖拽线
-    if (this.isDragging && this.dragStart && this.dragEnd) {
+    // 绘制拖拽线（从事件管理器获取拖拽状态）
+    const dragState = this.eventManager.getDragState();
+    if (dragState.isDragging && dragState.dragStart && dragState.dragEnd) {
       ctx.strokeStyle = '#2ecc71';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(this.dragStart.x, this.dragStart.y);
-      ctx.lineTo(this.dragEnd.x, this.dragEnd.y);
+      ctx.moveTo(dragState.dragStart.x, dragState.dragStart.y);
+      ctx.lineTo(dragState.dragEnd.x, dragState.dragEnd.y);
       ctx.stroke();
       
-      const dx = this.dragStart.x - this.dragEnd.x;
-      const dy = this.dragStart.y - this.dragEnd.y;
+      const dx = dragState.dragStart.x - dragState.dragEnd.x;
+      const dy = dragState.dragStart.y - dragState.dragEnd.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       const power = Math.min(dist, 200) / 200;
       
       ctx.fillStyle = `rgb(${Math.floor(power * 255)}, ${Math.floor((1 - power) * 255)}, 0)`;
       ctx.beginPath();
-      ctx.arc(this.dragEnd.x, this.dragEnd.y, 10, 0, Math.PI * 2);
+      ctx.arc(dragState.dragEnd.x, dragState.dragEnd.y, 10, 0, Math.PI * 2);
       ctx.fill();
       
       // 绘制力量条
@@ -451,6 +290,65 @@ class RetroMarbleGame {
   }
 
   /**
+   * 获取游戏状态
+   */
+  public getState(): GameState {
+    return this.state;
+  }
+
+  /**
+   * 设置游戏状态
+   */
+  public setState(state: GameState): void {
+    this.state = state;
+  }
+
+  /**
+   * 获取菜单状态
+   */
+  public getMenuState(): MenuState {
+    return this.menuState;
+  }
+
+  /**
+   * 设置菜单状态
+   */
+  public setMenuState(state: MenuState): void {
+    this.menuState = state;
+    if (state !== 'NONE') {
+      this.state = GameState.MENU;
+    }
+  }
+
+  /**
+   * 获取当前回合
+   */
+  public getTurn(): Turn {
+    return this.turn;
+  }
+
+  /**
+   * 切换回合
+   */
+  public switchTurn(): void {
+    this.turn = this.turn === Turn.PLAYER ? Turn.AI : Turn.PLAYER;
+  }
+
+  /**
+   * 重置回合计时器
+   */
+  public resetTurnTimer(): void {
+    this.turnTimer = databus.config.TURN_TIME;
+  }
+
+  /**
+   * 获取物理引擎
+   */
+  public getPhysicsEngine(): PhysicsEngine {
+    return this.physics;
+  }
+
+  /**
    * 外部方法：领取积分
    */
   public claimPoints(): boolean {
@@ -471,23 +369,7 @@ class RetroMarbleGame {
    * 外部方法：切换暂停/继续
    */
   public togglePause(): void {
-    if (this.state === GameState.PLAYING) {
-      this.menuState = 'MAIN';
-      this.state = GameState.MENU;
-    } else if (this.state === GameState.MENU) {
-      this.menuState = 'NONE';
-      this.state = GameState.PLAYING;
-    }
-  }
-
-  /**
-   * 设置菜单状态
-   */
-  public setMenuState(state: MenuState): void {
-    this.menuState = state;
-    if (state !== 'NONE') {
-      this.state = GameState.MENU;
-    }
+    this.eventManager.togglePause();
   }
 }
 

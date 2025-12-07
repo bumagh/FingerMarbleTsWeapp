@@ -45,27 +45,14 @@ export class MenuSystem {
     this.showMainMenu();
   }
 
-  // 响应窗口大小变化
-  public resize(w: number, h: number): void {
-    this.width = w;
-    this.height = h;
-    this.refreshLayout();
-  }
 
-  private refreshLayout(): void {
-    if (this.gameOverInfo) {
-      this.setupGameOverMenu(this.gameOverInfo.win);
-    } else {
-      this.showMainMenu();
-    }
-  }
 
   // 主渲染循环调用 - 修改为接收状态参数
   public render(state: MenuState): void {
     if (state === 'NONE') return;
 
     this.ctx.save();
-    
+
     // 绘制背景 (全屏或半透明遮罩)
     if (state === 'MAIN' || state === 'HELP') {
       this.ctx.fillStyle = this.colors.secondary;
@@ -156,7 +143,7 @@ export class MenuSystem {
     this.buttons = [];
     const btnW = 140;
     const btnH = 50;
-    
+
     // 底部返回按钮
     this.addButton("back", "返回", (this.width - btnW) / 2, this.height - 80, btnW, btnH, () => {
       this.showMainMenu();
@@ -173,7 +160,7 @@ export class MenuSystem {
     const gap = 20;
 
     const actionText = win ? "下一关" : "再试一次";
-    
+
     this.addButton("restart", actionText, centerX, startY, btnW, btnH, () => {
       if (this.onRestart) this.onRestart();
     });
@@ -197,7 +184,7 @@ export class MenuSystem {
     this.ctx.textAlign = "center";
     this.ctx.textBaseline = "middle";
     this.ctx.fillText(text, this.width / 2, this.height * yRatio);
-    
+
     // 装饰性下划线
     const lineY = this.height * yRatio + 30;
     this.ctx.beginPath();
@@ -239,11 +226,11 @@ export class MenuSystem {
     lines.forEach(line => {
       // 简单的加粗标题检测
       if (line.endsWith(':')) {
-         this.ctx.font = "bold 17px 'Arial', 'Microsoft YaHei', sans-serif";
-         this.ctx.fillStyle = this.colors.accent;
+        this.ctx.font = "bold 17px 'Arial', 'Microsoft YaHei', sans-serif";
+        this.ctx.fillStyle = this.colors.accent;
       } else {
-         this.ctx.font = "16px 'Arial', 'Microsoft YaHei', sans-serif";
-         this.ctx.fillStyle = this.colors.text;
+        this.ctx.font = "16px 'Arial', 'Microsoft YaHei', sans-serif";
+        this.ctx.fillStyle = this.colors.text;
       }
       this.ctx.fillText(line, this.width / 2, y);
       y += lineHeight;
@@ -263,7 +250,7 @@ export class MenuSystem {
     this.ctx.strokeStyle = this.colors.primary;
     this.ctx.lineWidth = 2;
     this.ctx.strokeRect(btn.x, btn.y, btn.w, btn.h);
-    
+
     this.ctx.strokeStyle = this.colors.accent;
     this.ctx.lineWidth = 1;
     this.ctx.strokeRect(btn.x + 4, btn.y + 4, btn.w - 8, btn.h - 8);
@@ -274,11 +261,11 @@ export class MenuSystem {
     this.ctx.textAlign = "center";
     this.ctx.textBaseline = "middle";
     this.ctx.fillText(btn.text, btn.x + btn.w / 2, btn.y + btn.h / 2);
-    
+
     // 按钮两侧装饰点
     this.ctx.beginPath();
-    this.ctx.arc(btn.x + 12, btn.y + btn.h/2, 2, 0, Math.PI*2);
-    this.ctx.arc(btn.x + btn.w - 12, btn.y + btn.h/2, 2, 0, Math.PI*2);
+    this.ctx.arc(btn.x + 12, btn.y + btn.h / 2, 2, 0, Math.PI * 2);
+    this.ctx.arc(btn.x + btn.w - 12, btn.y + btn.h / 2, 2, 0, Math.PI * 2);
     this.ctx.fillStyle = this.colors.accent;
     this.ctx.fill();
   }
@@ -319,7 +306,7 @@ export class MenuSystem {
   private drawCornerTL(x: number, y: number): void {
     this.ctx.strokeStyle = this.colors.accent;
     this.ctx.lineWidth = 2;
-    
+
     // 绘制L形折线
     this.ctx.beginPath();
     this.ctx.moveTo(x, y + 25);
@@ -336,7 +323,7 @@ export class MenuSystem {
   private drawCornerTR(x: number, y: number): void {
     this.ctx.strokeStyle = this.colors.accent;
     this.ctx.lineWidth = 2;
-    
+
     // 绘制L形折线（镜像到右侧）
     this.ctx.beginPath();
     this.ctx.moveTo(x, y + 25);
@@ -353,7 +340,7 @@ export class MenuSystem {
   private drawCornerBL(x: number, y: number): void {
     this.ctx.strokeStyle = this.colors.accent;
     this.ctx.lineWidth = 2;
-    
+
     // 绘制L形折线（镜像到底部）
     this.ctx.beginPath();
     this.ctx.moveTo(x, y - 25);
@@ -370,7 +357,7 @@ export class MenuSystem {
   private drawCornerBR(x: number, y: number): void {
     this.ctx.strokeStyle = this.colors.accent;
     this.ctx.lineWidth = 2;
-    
+
     // 绘制L形折线（镜像到右下角）
     this.ctx.beginPath();
     this.ctx.moveTo(x, y - 25);
