@@ -110,9 +110,37 @@ export default class EventManager
     if ( gameState === GameState.PLAYING || gameState === GameState.AIMING )
     {
       this.handleGameTouchStart( x, y );
+      // 检查是否点击了重新开始按钮
+      if ( this.checkRestartButtonClick( x, y ) )
+      {
+        console.log( '点击了重新开始按钮' );
+        this.handleRestart();
+        return;
+      }
     }
   }
+  // 添加处理重新开始的方法
+  private handleRestart (): void
+  {
+    console.log( '重新开始游戏' );
+    this.main.setState( GameState.PLAYING );
+    this.main.resetGame();
+    this.main.setMenuState( 'NONE' );
+  }
+  // 添加检查重新开始按钮点击的方法
+  private checkRestartButtonClick ( x: number, y: number ): boolean
+  {
+    // 需要从 main 获取按钮位置信息
+    const buttonRect = this.main.getRestartButtonRect();
+    if ( !buttonRect ) return false;
 
+    return (
+      x >= buttonRect.x &&
+      x <= buttonRect.x + buttonRect.width &&
+      y >= buttonRect.y &&
+      y <= buttonRect.y + buttonRect.height
+    );
+  }
   /**
    * 处理游戏中的触摸开始
    */

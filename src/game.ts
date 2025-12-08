@@ -17,6 +17,7 @@ enum Turn { PLAYER, AI }
 
 class RetroMarbleGame
 {
+  private restartButtonRect: { x: number, y: number, width: number, height: number } | null = null;
   private state: GameState = GameState.MENU;
   private turn: Turn = Turn.PLAYER;
   private turnTimer: number = databus.config.TURN_TIME;
@@ -144,13 +145,18 @@ class RetroMarbleGame
         }
       } );
 
+      // 调试：打印当前状态和回合
+      if ( Date.now() % 1000 < 50 )
+      { // 每1秒打印一次
+        console.log( `[状态] ${ GameState[ this.state ] }, [回合] ${ Turn[ this.turn ] }` );
+      }
       // 检测是否静止
       const isMoving = databus.balls.some( ball =>
         !ball.isStatic && ( Math.abs( ball.vx ) > 0.1 || Math.abs( ball.vy ) > 0.1 )
       );
-
       if ( this.state === GameState.MOVING && !isMoving )
       {
+        console.log( "this.state === GameState.MOVING to SETTLING" );
         this.state = GameState.SETTLING;
         setTimeout( () => this.eventManager.settleRound(), 100 );
       }
@@ -181,8 +187,45 @@ class RetroMarbleGame
     {
       this.menu.render( this.menuState );
     }
+    // 添加重新开始按钮
+    this.renderRestartButton();
   }
+  // 添加新的渲染方法
+  private renderRestartButton (): void
+  {
+    const buttonWidth = 100;
+    const buttonHeight = 40;
+    const buttonX = databus.config.WIDTH - buttonWidth - 20;
+    const buttonY = 20;
 
+    // 绘制按钮背景
+    ctx.fillStyle = 'rgba(231, 76, 60, 0.8)'; // 红色
+    ctx.fillRect( buttonX, buttonY, buttonWidth, buttonHeight );
+
+    // 绘制按钮边框
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.lineWidth = 2;
+    ctx.strokeRect( buttonX, buttonY, buttonWidth, buttonHeight );
+
+    // 绘制按钮文字
+    ctx.fillStyle = '#ecf0f1';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+      '重新开始',
+      buttonX + buttonWidth / 2,
+      buttonY + buttonHeight / 2
+    );
+
+    // 存储按钮位置信息用于点击检测
+    this.restartButtonRect = {
+      x: buttonX,
+      y: buttonY,
+      width: buttonWidth,
+      height: buttonHeight
+    };
+  }
   private renderGame (): void
   {
     // 绘制背景
@@ -411,6 +454,13 @@ class RetroMarbleGame
   public togglePause (): void
   {
     this.eventManager.togglePause();
+  }
+
+  // 添加获取重新开始按钮信息的方法
+  public getRestartButtonRect (): { x: number, y: number, width: number, height: number } | null
+  {
+    // 这个方法需要在 RetroMarbleGame 中实现
+    return this.restartButtonRect;
   }
 }
 
