@@ -105,10 +105,10 @@ class DataBus
   public claimAmount: number = 5;
 
   // 物理参数
-  public gravity: number = 0.6;
+  public gravity: number = 0.3;
   public friction: number = 0.95;
   public bounceDamping: number = 0.85;
-  public airResistance: number = 0.99;
+  public airResistance: number = 0.95;
 
   // 游戏对象
   public balls: GameBall[] = [];
@@ -120,7 +120,7 @@ class DataBus
   public playerGrade: number = 1;
   public playerExp: number = 0;
   public handSpan: number = 20; // "一扎"距离
-  public maxForce: number = 1800;
+  public maxForce: number = 18000;
 
   // 游戏配置（为了集中管理）
   public config = {
@@ -128,10 +128,10 @@ class DataBus
     HEIGHT: 667,
     PLAYER_RADIUS: 15,
     ENEMY_RADIUS: 15,
-    OBSTACLE_COUNT: 3,
-    TURN_TIME: 10,
+    OBSTACLE_COUNT: 8,
+    TURN_TIME: 6,
     HAND_SPAN: 20,
-    MAX_FORCE: 800,
+    MAX_FORCE: 1800,
     BACKGROUND_COLOR: '#2c3e50',
     BALL_COLORS: {
       player: '#3498db',
@@ -177,10 +177,10 @@ class DataBus
     this.claimAmount = 5;
 
     // 重置物理参数
-    this.gravity = 0.6;
+    this.gravity = 0.3;
     this.friction = 0.95;
     this.bounceDamping = 0.85;
-    this.airResistance = 0.99;
+    this.airResistance = 0.95;
 
     // 清空游戏对象
     this.balls = [];
@@ -192,7 +192,7 @@ class DataBus
     this.playerGrade = 1;
     this.playerExp = 0;
     this.handSpan = 120;
-    this.maxForce = 800;
+    this.maxForce = 18000;
 
     this.pool.clear();
   }
@@ -234,8 +234,8 @@ class DataBus
     ball.mass = 1;
     ball.radius = type === 'player' ? this.config.PLAYER_RADIUS : this.config.ENEMY_RADIUS;
     ball.isStatic = false;
-    ball.restitution = 0.7;
-    ball.friction = 0.02;
+    ball.restitution = 0.9;
+    ball.friction = 0.01;
     ball.color = type === 'player' ? this.config.BALL_COLORS.player : this.config.BALL_COLORS.enemy;
     ball.isPlayer = type === 'player';
     ball.isEnemy = type === 'enemy';

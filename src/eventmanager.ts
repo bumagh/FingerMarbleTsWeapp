@@ -208,13 +208,13 @@ export default class EventManager
     // 如果拖拽距离足够大，则发射弹珠
     if ( dist > 15 )
     {
-      const power = Math.min( dist, 200 ) / 200;
+      const power = Math.min( dist, 900 ) / 900;
       const force = power * this.databus.maxForce;
       const angle = Math.atan2( dy, dx );
 
       // 应用力量到弹珠
-      player.vx = Math.cos( angle ) * force * 0.1;
-      player.vy = Math.sin( angle ) * force * 0.1;
+      player.vx = Math.cos( angle ) * force * 0.5;
+      player.vy = Math.sin( angle ) * force * 0.5;
 
       // 切换到移动状态并重置回合计时器
       this.main.setState( GameState.MOVING );
@@ -222,7 +222,7 @@ export default class EventManager
     }
 
     // 返回游戏状态
-    this.main.setState( GameState.PLAYING );
+    // this.main.setState( GameState.PLAYING );
   }
 
   /**
@@ -276,8 +276,8 @@ export default class EventManager
     const finalAngle = angle + error;
 
     // 应用力量到敌人弹珠
-    enemy.vx = Math.cos( finalAngle ) * force * 0.1;
-    enemy.vy = Math.sin( finalAngle ) * force * 0.1;
+    enemy.vx = Math.cos( finalAngle ) * force * 0.5;
+    enemy.vy = Math.sin( finalAngle ) * force * 0.5;
 
     // 切换到移动状态并重置回合计时器
     this.main.setState( GameState.MOVING );

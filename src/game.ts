@@ -186,9 +186,9 @@ class RetroMarbleGame
     if ( this.state === GameState.MENU || this.state === GameState.GAME_OVER )
     {
       this.menu.render( this.menuState );
-    }
-    // 添加重新开始按钮
-    this.renderRestartButton();
+    } else
+      // 添加重新开始按钮
+      this.renderRestartButton();
   }
   // 添加新的渲染方法
   private renderRestartButton (): void
