@@ -4,8 +4,7 @@
  * 游戏状态管理器 - DataBus
  * 集中管理游戏状态、物理参数、游戏对象等数据
  */
-export interface GameBall
-{
+export interface GameBall {
   id: string;
   type: 'circle';
   x: number;
@@ -23,11 +22,10 @@ export interface GameBall
   hasBet?: boolean;
   finished?: boolean;
   finishTime?: number;
-  onCollide?: ( other: any, force: number ) => void;
+  onCollide?: (other: any, force: number) => void;
 }
 
-export interface GameObstacle
-{
+export interface GameObstacle {
   id: string;
   type: 'rectangle';
   x: number;
@@ -44,57 +42,47 @@ export interface GameObstacle
 }
 
 // 对象池基类
-class Pool
-{
+class Pool {
   private poolDict: Map<string, any[]> = new Map();
 
-  getItemByClass ( name: string, className: any ): any
-  {
-    if ( !this.poolDict.has( name ) )
-    {
-      this.poolDict.set( name, [] );
+  getItemByClass(name: string, className: any): any {
+    if (!this.poolDict.has(name)) {
+      this.poolDict.set(name, []);
     }
 
-    const pool = this.poolDict.get( name )!;
-    if ( pool.length === 0 )
-    {
+    const pool = this.poolDict.get(name)!;
+    if (pool.length === 0) {
       return new className();
-    } else
-    {
+    } else {
       return pool.shift();
     }
   }
 
-  recover ( name: string, instance: any ): void
-  {
-    if ( this.poolDict.has( name ) )
-    {
-      this.poolDict.get( name )!.push( instance );
-    } else
-    {
-      this.poolDict.set( name, [ instance ] );
+  recover(name: string, instance: any): void {
+    if (this.poolDict.has(name)) {
+      this.poolDict.get(name)!.push(instance);
+    } else {
+      this.poolDict.set(name, [instance]);
     }
   }
 
-  clear (): void
-  {
+  clear(): void {
     this.poolDict.clear();
   }
 
-  size ( name: string ): number
-  {
-    return this.poolDict.get( name )?.length || 0;
+  size(name: string): number {
+    return this.poolDict.get(name)?.length || 0;
   }
 }
 
 // DataBus 单例类
-class DataBus
-{
+class DataBus {
   private static instance: DataBus;
 
   public pool: Pool;
 
   // 游戏状态
+  private currentMarble: string = 'basic_red'; // 当前使用的弹珠ID
   public frame: number = 0;
   public score: number = 10; // 初始积分
   public gameState: 'idle' | 'preview' | 'betting' | 'running' | 'paused' | 'finished' = 'idle';
@@ -140,15 +128,45 @@ class DataBus
     OBSTACLE_COLOR: '#95a5a6'
   };
 
-  private constructor ()
-  {
+  private constructor() {
     this.pool = new Pool();
+    this.loadFromLocal();
+  }
+  // 获取当前弹珠ID
+  public getCurrentMarble(): string {
+    return this.currentMarble;
   }
 
-  public static getInstance (): DataBus
-  {
-    if ( !DataBus.instance )
-    {
+  // 设置当前弹珠
+  setCurrentMarble(marbleId: string): void {
+    this.currentMarble = marbleId;
+    this.saveToLocal();
+  }
+
+  // 本地存储相关
+  private saveToLocal(): void {
+    if (typeof wx !== 'undefined' && wx.setStorageSync) {
+      wx.setStorageSync('score', this.score);
+      wx.setStorageSync('currentMarble', this.currentMarble);
+      // 可以保存更多数据...
+    }
+  }
+
+  private loadFromLocal(): void {
+    if (typeof wx !== 'undefined' && wx.getStorageSync) {
+      const savedScore = wx.getStorageSync('score');
+      if (savedScore !== undefined) {
+        this.score = savedScore;
+      }
+
+      const savedMarble = wx.getStorageSync('currentMarble');
+      if (savedMarble !== undefined) {
+        this.currentMarble = savedMarble;
+      }
+    }
+  }
+  public static getInstance(): DataBus {
+    if (!DataBus.instance) {
       DataBus.instance = new DataBus();
     }
     return DataBus.instance;
@@ -156,26 +174,23 @@ class DataBus
   /**
   * 初始化配置（在游戏开始时调用）
   */
-  public initConfig ( width: number, height: number ): void
-  {
+  public initConfig(width: number, height: number): void {
     this.config.WIDTH = width;
     this.config.HEIGHT = height;
-    console.log( `DataBus配置初始化: ${ width }x${ height }` );
+    console.log(`DataBus配置初始化: ${width}x${height}`);
   }
   /**
    * 重置游戏数据
    */
-  reset (): void
-  {
+  reset(): void {
     this.frame = 0;
-    this.score = 10;
     this.gameState = 'idle';
     this.selectedBall = null;
     this.betAmount = 0;
     this.lastClaimTime = 0;
     this.claimCooldown = 3600000;
     this.claimAmount = 5;
-
+    // 保留积分，只重置游戏状态
     // 重置物理参数
     this.gravity = 0.3;
     this.friction = 0.95;
@@ -200,30 +215,26 @@ class DataBus
   /**
    * 回收对象到对象池
    */
-  removeItem ( item: any ): void
-  {
+  removeItem(item: any): void {
     // 这里可以根据item的类型进行回收
-    if ( item.type === 'circle' )
-    {
-      this.pool.recover( 'ball', item );
-    } else if ( item.type === 'rectangle' )
-    {
-      this.pool.recover( 'obstacle', item );
+    if (item.type === 'circle') {
+      this.pool.recover('ball', item);
+    } else if (item.type === 'rectangle') {
+      this.pool.recover('obstacle', item);
     }
   }
 
   /**
    * 创建弹珠对象（使用对象池）
    */
-  createBall (
+  createBall(
     id: string,
     x: number,
     y: number,
     type: 'player' | 'enemy',
-    onCollide?: ( other: any, force: number ) => void
-  ): GameBall
-  {
-    const ball = this.pool.getItemByClass( 'ball', Object ) as GameBall;
+    onCollide?: (other: any, force: number) => void
+  ): GameBall {
+    const ball = this.pool.getItemByClass('ball', Object) as GameBall;
 
     ball.id = id;
     ball.type = 'circle';
@@ -250,15 +261,14 @@ class DataBus
   /**
    * 创建障碍物对象（使用对象池）
    */
-  createObstacle (
+  createObstacle(
     id: string,
     x: number,
     y: number,
     width: number,
     height: number
-  ): GameObstacle
-  {
-    const obstacle = this.pool.getItemByClass( 'obstacle', Object ) as GameObstacle;
+  ): GameObstacle {
+    const obstacle = this.pool.getItemByClass('obstacle', Object) as GameObstacle;
 
     obstacle.id = id;
     obstacle.type = 'rectangle';
@@ -280,35 +290,30 @@ class DataBus
   /**
    * 获取玩家弹珠
    */
-  getPlayerBall (): GameBall | undefined
-  {
-    return this.balls.find( ball => ball.isPlayer );
+  getPlayerBall(): GameBall | undefined {
+    return this.balls.find(ball => ball.isPlayer);
   }
 
   /**
    * 获取敌人弹珠
    */
-  getEnemyBall (): GameBall | undefined
-  {
-    return this.balls.find( ball => ball.isEnemy );
+  getEnemyBall(): GameBall | undefined {
+    return this.balls.find(ball => ball.isEnemy);
   }
 
   /**
    * 设置选中弹珠
    */
-  selectBall ( ballId: string ): void
-  {
-    this.selectedBall = this.balls.find( ball => ball.id === ballId ) || null;
+  selectBall(ballId: string): void {
+    this.selectedBall = this.balls.find(ball => ball.id === ballId) || null;
 
     // 重置所有弹珠的选中状态
-    this.balls.forEach( ball =>
-    {
-      if ( ball.hasBet ) ball.hasBet = false;
-    } );
+    this.balls.forEach(ball => {
+      if (ball.hasBet) ball.hasBet = false;
+    });
 
     // 设置选中的弹珠
-    if ( this.selectedBall )
-    {
+    if (this.selectedBall) {
       this.selectedBall.hasBet = true;
     }
   }
@@ -316,8 +321,7 @@ class DataBus
   /**
    * 检查是否可以领取积分
    */
-  canClaimPoints (): boolean
-  {
+  canClaimPoints(): boolean {
     const now = Date.now();
     return now - this.lastClaimTime >= this.claimCooldown;
   }
@@ -325,29 +329,37 @@ class DataBus
   /**
    * 领取积分
    */
-  claimPoints (): boolean
-  {
-    if ( this.canClaimPoints() )
-    {
+  claimPoints(): boolean {
+    if (this.canClaimPoints()) {
       this.score += this.claimAmount;
       this.lastClaimTime = Date.now();
       return true;
     }
     return false;
   }
-
+  spendScore(points: number): boolean {
+    if (this.score >= points) {
+      this.score -= points;
+      this.saveToLocal();
+      return true;
+    }
+    return false;
+  }
+  // 添加积分
+  addScore(points: number): void {
+    this.score += points;
+    // 保存到本地存储
+    this.saveToLocal();
+  }
   /**
    * 下注
    */
-  placeBet ( amount: number ): boolean
-  {
-    if ( !this.selectedBall )
-    {
+  placeBet(amount: number): boolean {
+    if (!this.selectedBall) {
       return false;
     }
 
-    if ( amount <= 0 || amount > this.score )
-    {
+    if (amount <= 0 || amount > this.score) {
       return false;
     }
 
@@ -355,10 +367,9 @@ class DataBus
     this.score -= amount;
 
     // 重置所有弹珠的下注状态
-    this.balls.forEach( ball =>
-    {
+    this.balls.forEach(ball => {
       ball.hasBet = false;
-    } );
+    });
 
     // 设置选中的弹珠已下注
     this.selectedBall.hasBet = true;
@@ -369,22 +380,19 @@ class DataBus
   /**
    * 获取冷却剩余时间（毫秒）
    */
-  getClaimCooldownRemaining (): number
-  {
+  getClaimCooldownRemaining(): number {
     const now = Date.now();
     const elapsed = now - this.lastClaimTime;
-    return Math.max( 0, this.claimCooldown - elapsed );
+    return Math.max(0, this.claimCooldown - elapsed);
   }
 
   /**
    * 增加经验
    */
-  addExp ( amount: number ): void
-  {
+  addExp(amount: number): void {
     this.playerExp += amount;
     // 检查是否升级
-    while ( this.playerExp >= 100 )
-    {
+    while (this.playerExp >= 100) {
       this.playerExp -= 100;
       this.playerGrade++;
       this.handSpan += 5; // 升级增加一扎距离
@@ -395,19 +403,17 @@ class DataBus
   /**
    * 检查游戏是否结束
    */
-  checkGameFinish (): boolean
-  {
-    return this.balls.every( ball => ball.finished );
+  checkGameFinish(): boolean {
+    return this.balls.every(ball => ball.finished);
   }
 
   /**
    * 获取排名
    */
-  getRanking (): GameBall[]
-  {
-    return [ ...this.balls ]
-      .filter( ball => ball.finished )
-      .sort( ( a, b ) => ( a.finishTime || 0 ) - ( b.finishTime || 0 ) );
+  getRanking(): GameBall[] {
+    return [...this.balls]
+      .filter(ball => ball.finished)
+      .sort((a, b) => (a.finishTime || 0) - (b.finishTime || 0));
   }
 }
 
