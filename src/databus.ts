@@ -184,7 +184,7 @@ class DataBus
       const savedScore = wx.getStorageSync( 'score' );
       if ( savedScore !== undefined )
       {
-        this.score = savedScore;
+        this.score = Number( savedScore ) || 0;
       }
 
       const savedMarble = wx.getStorageSync( 'currentMarble' );

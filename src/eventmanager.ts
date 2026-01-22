@@ -208,6 +208,13 @@ export default class EventManager
         this.handleRestart();
         return;
       }
+      // 检查是否点击了退出按钮
+      if ( this.checkExitButtonClick( x, y ) )
+      {
+        console.log( '点击了退出按钮' );
+        this.handleExit();
+        return;
+      }
     }
   }
   // 添加处理重新开始的方法
@@ -218,11 +225,30 @@ export default class EventManager
     this.main.resetGame();
     this.main.setMenuState( 'NONE' );
   }
+  // 添加处理退出的方法
+  private handleExit (): void
+  {
+    console.log( '退出游戏返回主菜单' );
+    this.main.exitGame();
+  }
   // 添加检查重新开始按钮点击的方法
   private checkRestartButtonClick ( x: number, y: number ): boolean
   {
     // 需要从 main 获取按钮位置信息
     const buttonRect = this.main.getRestartButtonRect();
+    if ( !buttonRect ) return false;
+
+    return (
+      x >= buttonRect.x &&
+      x <= buttonRect.x + buttonRect.width &&
+      y >= buttonRect.y &&
+      y <= buttonRect.y + buttonRect.height
+    );
+  }
+  // 添加检查退出按钮点击的方法
+  private checkExitButtonClick ( x: number, y: number ): boolean
+  {
+    const buttonRect = this.main.getExitButtonRect();
     if ( !buttonRect ) return false;
 
     return (

@@ -18,6 +18,7 @@ enum Turn { PLAYER, AI }
 class RetroMarbleGame
 {
   private restartButtonRect: { x: number, y: number, width: number, height: number } | null = null;
+  private exitButtonRect: { x: number, y: number, width: number, height: number } | null = null;
   private state: GameState = GameState.MENU;
   private turn: Turn = Turn.PLAYER;
   private turnTimer: number = databus.config.TURN_TIME;
@@ -183,29 +184,31 @@ class RetroMarbleGame
 
     // 然后在顶部渲染菜单（如果有）
     // 渲染菜单（如果需要）
-    if ( this.state === GameState.MENU || this.state === GameState.GAME_OVER )
+    if (this.state === GameState.MENU || this.state === GameState.GAME_OVER)
     {
-      this.menu.render( this.menuState );
+      this.menu.render(this.menuState);
     } else
-      // 添加重新开始按钮
+      // 添加重新开始按钮和退出按钮
       this.renderRestartButton();
+    this.renderExitButton();
   }
+
   // 添加新的渲染方法
-  private renderRestartButton (): void
+  private renderRestartButton(): void
   {
     const buttonWidth = 100;
     const buttonHeight = 40;
-    const buttonX = databus.config.WIDTH - buttonWidth - 20;
+    const buttonX = 20; // 移到左上角
     const buttonY = 20;
 
     // 绘制按钮背景
     ctx.fillStyle = 'rgba(231, 76, 60, 0.8)'; // 红色
-    ctx.fillRect( buttonX, buttonY, buttonWidth, buttonHeight );
+    ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
 
     // 绘制按钮边框
     ctx.strokeStyle = '#ecf0f1';
     ctx.lineWidth = 2;
-    ctx.strokeRect( buttonX, buttonY, buttonWidth, buttonHeight );
+    ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
 
     // 绘制按钮文字
     ctx.fillStyle = '#ecf0f1';
@@ -226,14 +229,52 @@ class RetroMarbleGame
       height: buttonHeight
     };
   }
-  private renderGame (): void
+
+  // 添加退出按钮渲染方法
+  private renderExitButton(): void
+  {
+    const buttonWidth = 80;
+    const buttonHeight = 40;
+    const buttonX = 20; // 移到左上角
+    const buttonY = 70; // 在重新开始按钮下方
+
+    // 绘制按钮背景
+    ctx.fillStyle = 'rgba(52, 73, 94, 0.8)'; // 深灰色
+    ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+
+    // 绘制按钮边框
+    ctx.strokeStyle = '#ecf0f1';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
+
+    // 绘制按钮文字
+    ctx.fillStyle = '#ecf0f1';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+      '退出',
+      buttonX + buttonWidth / 2,
+      buttonY + buttonHeight / 2
+    );
+
+    // 存储按钮位置信息用于点击检测
+    this.exitButtonRect = {
+      x: buttonX,
+      y: buttonY,
+      width: buttonWidth,
+      height: buttonHeight
+    };
+  }
+
+  private renderGame(): void
   {
     // 绘制背景
     ctx.fillStyle = databus.config.BACKGROUND_COLOR;
-    ctx.fillRect( 0, 0, databus.config.WIDTH, databus.config.HEIGHT );
+    ctx.fillRect(0, 0, databus.config.WIDTH, databus.config.HEIGHT);
 
     // 绘制所有物体
-    [ ...databus.balls, ...databus.obstacles ].forEach( body =>
+    [...databus.balls, ...databus.obstacles].forEach(body =>
     {
       ctx.save();
 
@@ -241,12 +282,12 @@ class RetroMarbleGame
       ctx.strokeStyle = '#ecf0f1';
       ctx.lineWidth = 2;
 
-      if ( body.type === 'circle' )
+      if (body.type === 'circle')
       {
         const ball = body as GameBall;
 
         ctx.beginPath();
-        ctx.arc( ball.x, ball.y, ball.radius, 0, Math.PI * 2 );
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
 
@@ -262,88 +303,89 @@ class RetroMarbleGame
         ctx.fill();
 
         // 如果已下注，显示特殊标记
-        if ( ball.hasBet )
+        if (ball.hasBet)
         {
           ctx.fillStyle = '#f1c40f';
           ctx.beginPath();
-          ctx.arc( ball.x, ball.y, ball.radius * 0.6, 0, Math.PI * 2 );
+          ctx.arc(ball.x, ball.y, ball.radius * 0.6, 0, Math.PI * 2);
           ctx.fill();
         }
-      } else if ( body.type === 'rectangle' )
+      } else if (body.type === 'rectangle')
       {
         const obstacle = body as GameObstacle;
 
-        ctx.fillRect( obstacle.x, obstacle.y, obstacle.width, obstacle.height );
-        ctx.strokeRect( obstacle.x, obstacle.y, obstacle.width, obstacle.height );
+        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+        ctx.strokeRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
       }
 
       ctx.restore();
-    } );
+    });
 
     // 绘制拖拽线（从事件管理器获取拖拽状态）
     const dragState = this.eventManager.getDragState();
-    if ( dragState.isDragging && dragState.dragStart && dragState.dragEnd )
+    if (dragState.isDragging && dragState.dragStart && dragState.dragEnd)
     {
       ctx.strokeStyle = '#2ecc71';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo( dragState.dragStart.x, dragState.dragStart.y );
-      ctx.lineTo( dragState.dragEnd.x, dragState.dragEnd.y );
+      ctx.moveTo(dragState.dragStart.x, dragState.dragStart.y);
+      ctx.lineTo(dragState.dragEnd.x, dragState.dragEnd.y);
       ctx.stroke();
 
       const dx = dragState.dragStart.x - dragState.dragEnd.x;
       const dy = dragState.dragStart.y - dragState.dragEnd.y;
-      const dist = Math.sqrt( dx * dx + dy * dy );
-      const power = Math.min( dist, 200 ) / 200;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const power = Math.min(dist, 200) / 200;
 
-      ctx.fillStyle = `rgb(${ Math.floor( power * 255 ) }, ${ Math.floor( ( 1 - power ) * 255 ) }, 0)`;
+      ctx.fillStyle = `rgb(${Math.floor(power * 255)}, ${Math.floor((1 - power) * 255)}, 0)`;
       ctx.beginPath();
-      ctx.arc( dragState.dragEnd.x, dragState.dragEnd.y, 10, 0, Math.PI * 2 );
+      ctx.arc(dragState.dragEnd.x, dragState.dragEnd.y, 10, 0, Math.PI * 2);
       ctx.fill();
 
       // 绘制力量条
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect( databus.config.WIDTH - 30, 20, 20, 100 );
+      ctx.fillRect(databus.config.WIDTH - 30, 20, 20, 100);
       ctx.fillStyle = '#2ecc71';
-      ctx.fillRect( databus.config.WIDTH - 30, 20 + ( 1 - power ) * 100, 20, power * 100 );
+      ctx.fillRect(databus.config.WIDTH - 30, 20 + (1 - power) * 100, 20, power * 100);
     }
 
     // 绘制"一扎"范围
-    if ( this.state === GameState.SETTLING )
+    if (this.state === GameState.SETTLING)
     {
       const player = databus.getPlayerBall();
-      if ( player )
+      if (player)
       {
         ctx.strokeStyle = 'rgba(52, 152, 219, 0.5)';
         ctx.lineWidth = 2;
-        ctx.setLineDash( [ 5, 5 ] );
+        ctx.setLineDash([5, 5]);
         ctx.beginPath();
-        ctx.arc( player.x, player.y, databus.handSpan, 0, Math.PI * 2 );
+        ctx.arc(player.x, player.y, databus.handSpan, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.setLineDash( [] );
+        ctx.setLineDash([]);
       }
     }
 
     // 绘制UI - 只在游戏进行中显示
-    if ( this.state !== GameState.MENU && this.state !== GameState.GAME_OVER )
+    if (this.state !== GameState.MENU && this.state !== GameState.GAME_OVER)
     {
       ctx.fillStyle = '#ecf0f1';
       ctx.font = '16px Arial';
       ctx.textAlign = 'left';
-      ctx.fillText( `等级: ${ databus.playerGrade }`, 20, 30 );
-      ctx.fillText( `经验: ${ databus.playerExp }/100`, 20, 55 );
-      ctx.fillText( `积分: ${ databus.score }`, 20, 80 );
-      ctx.fillText( `回合: ${ this.turn === Turn.PLAYER ? '玩家' : 'AI' }`, 20, 105 );
-      ctx.fillText( `时间: ${ Math.max( 0, this.turnTimer ).toFixed( 1 ) }s`, 20, 130 );
+      // 调整UI位置，避免与按钮重叠
+      ctx.fillText(`等级: ${databus.playerGrade}`, 120, 30);
+      ctx.fillText(`经验: ${databus.playerExp}/100`, 120, 55);
+      ctx.fillText(`积分: ${databus.score}`, 120, 80);
+      ctx.fillText(`回合: ${this.turn === Turn.PLAYER ? '玩家' : 'AI'}`, 120, 105);
+      ctx.fillText(`时间: ${Math.max(0, this.turnTimer).toFixed(1)}s`, 120, 130);
 
       // 显示下注金额
-      if ( databus.betAmount > 0 )
+      if (databus.betAmount > 0)
       {
-        ctx.fillText( `下注: ${ databus.betAmount }`, 20, 155 );
+        ctx.fillText(`下注: ${databus.betAmount}`, 120, 155);
       }
 
       // 显示一扎距离
-      ctx.fillText( `一扎: ${ databus.handSpan }px`, 20, 180 );
+      ctx.fillText(`一扎: ${databus.handSpan}px`, 120, 180);
     }
   }
 
@@ -351,19 +393,19 @@ class RetroMarbleGame
   private gameLoop = (): void =>
   {
     const current = Date.now();
-    const dt = ( current - this.lastTime ) / 1000 || 0.016;
+    const dt = (current - this.lastTime) / 1000 || 0.016;
     this.lastTime = current;
 
-    this.update( dt );
+    this.update(dt);
     this.render();
 
-    requestAnimationFrame( this.gameLoop );
+    requestAnimationFrame(this.gameLoop);
   }
 
   /**
    * 获取游戏状态
    */
-  public getState (): GameState
+  public getState(): GameState
   {
     return this.state;
   }
@@ -371,7 +413,7 @@ class RetroMarbleGame
   /**
    * 设置游戏状态
    */
-  public setState ( state: GameState ): void
+  public setState(state: GameState): void
   {
     this.state = state;
   }
@@ -379,7 +421,7 @@ class RetroMarbleGame
   /**
    * 获取菜单状态
    */
-  public getMenuState (): MenuState
+  public getMenuState(): MenuState
   {
     return this.menuState;
   }
@@ -387,10 +429,10 @@ class RetroMarbleGame
   /**
    * 设置菜单状态
    */
-  public setMenuState ( state: MenuState ): void
+  public setMenuState(state: MenuState): void
   {
     this.menuState = state;
-    if ( state !== 'NONE' )
+    if (state !== 'NONE')
     {
       this.state = GameState.MENU;
     }
@@ -399,7 +441,7 @@ class RetroMarbleGame
   /**
    * 获取当前回合
    */
-  public getTurn (): Turn
+  public getTurn(): Turn
   {
     return this.turn;
   }
@@ -407,7 +449,7 @@ class RetroMarbleGame
   /**
    * 切换回合
    */
-  public switchTurn (): void
+  public switchTurn(): void
   {
     this.turn = this.turn === Turn.PLAYER ? Turn.AI : Turn.PLAYER;
   }
@@ -415,7 +457,7 @@ class RetroMarbleGame
   /**
    * 重置回合计时器
    */
-  public resetTurnTimer (): void
+  public resetTurnTimer(): void
   {
     this.turnTimer = databus.config.TURN_TIME;
   }
@@ -423,7 +465,7 @@ class RetroMarbleGame
   /**
    * 获取物理引擎
    */
-  public getPhysicsEngine (): PhysicsEngine
+  public getPhysicsEngine(): PhysicsEngine
   {
     return this.physics;
   }
@@ -431,9 +473,9 @@ class RetroMarbleGame
   /**
    * 外部方法：领取积分
    */
-  public claimPoints (): boolean
+  public claimPoints(): boolean
   {
-    if ( databus.claimPoints() )
+    if (databus.claimPoints())
     {
       return true;
     }
@@ -443,24 +485,37 @@ class RetroMarbleGame
   /**
    * 外部方法：下注
    */
-  public placeBet ( amount: number ): boolean
+  public placeBet(amount: number): boolean
   {
-    return databus.placeBet( amount );
+    return databus.placeBet(amount);
   }
 
   /**
    * 外部方法：切换暂停/继续
    */
-  public togglePause (): void
+  public togglePause(): void
   {
     this.eventManager.togglePause();
   }
 
   // 添加获取重新开始按钮信息的方法
-  public getRestartButtonRect (): { x: number, y: number, width: number, height: number } | null
+  public getRestartButtonRect(): { x: number, y: number, width: number, height: number } | null
   {
-    // 这个方法需要在 RetroMarbleGame 中实现
     return this.restartButtonRect;
+  }
+
+  // 添加获取退出按钮信息的方法
+  public getExitButtonRect(): { x: number, y: number, width: number, height: number } | null
+  {
+    return this.exitButtonRect;
+  }
+
+  // 添加退出游戏的方法
+  public exitGame(): void
+  {
+    this.state = GameState.MENU;
+    this.menuState = 'MAIN';
+    this.resetGame();
   }
 }
 
