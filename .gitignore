@@ -1,3 +1,6 @@
 node_modules/
 src/**/*.js
 src/**/*.map
+mytsglib/
+mytsglib/*
+!/mytsglib/.git

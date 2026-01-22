@@ -1,3 +1,4 @@
 [submodule "mytsglib"]
 	path = mytsglib
 	url = git@github.com:bumagh/mytsglib.git
+	ignore = all
