@@ -3,8 +3,8 @@ import { PhysicsBody, PhysicsEngine } from "./physics";
 import { MenuSystem, MenuState } from "./menu";
 import DataBus, { GameBall, GameObstacle } from "./databus";
 import EventManager from "./eventmanager";
-import { getScreenInfo } from "./screen";
-
+import { getScreenInfo } from '../mytsglib/core/utils/screen/screenUtils'
+import { initWechatShare } from "../mytsglib/core/utils/shareUtils"
 const canvas = wx.createCanvas();
 const ctx = canvas.getContext('2d');
 
@@ -30,10 +30,8 @@ class RetroMarbleGame {
   private menuState: MenuState = 'MAIN';
 
   constructor() {
-
     // 初始化物理引擎
     this.physics = new PhysicsEngine(databus.config.WIDTH, databus.config.HEIGHT);
-
     // 初始化菜单系统
     this.menu = new MenuSystem(ctx, canvas);
 
@@ -41,6 +39,7 @@ class RetroMarbleGame {
     this.eventManager = new EventManager(this, canvas, this.menu);
     this.eventManager.init();
 
+    // initWechatShare();
     // 初始化游戏
     this.resetGame();
     this.gameLoop();

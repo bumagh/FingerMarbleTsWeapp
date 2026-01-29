@@ -1,5 +1,7 @@
 // src/menu.ts
 import { Vector } from "./physics";
+import { TextButton, TextButtonStyle, ButtonConfig } from "./ui/TextButton";
+import { ButtonManager } from "./ui/ButtonManager";
 
 // 扩展 MenuState 类型
 export type MenuState = 'MAIN' | 'HELP' | 'GAME_OVER' | 'SETTINGS' | 'STORE' | 'NONE';
@@ -48,6 +50,7 @@ export class MenuSystem
   private width: number;
   private height: number;
   private buttons: Button[] = [];
+  private buttonManager: ButtonManager;
   private gameOverInfo: { win: boolean; message: string } | null = null;
 
   // 弹珠商店数据
@@ -182,6 +185,7 @@ export class MenuSystem
     this.canvas = canvas;
     this.width = canvas.width;
     this.height = canvas.height;
+    this.buttonManager = new ButtonManager(ctx);
     this.showMainMenu();
   }
 
@@ -286,7 +290,7 @@ export class MenuSystem
     }
 
     // 绘制所有按钮
-    this.buttons.forEach( btn => this.drawButton( btn ) );
+    this.buttonManager.renderAll();
 
     this.ctx.restore();
   }
@@ -296,17 +300,8 @@ export class MenuSystem
   {
     let handled = false;
 
-    // 倒序检测，确保覆盖在上面的元素优先响应
-    for ( let i = this.buttons.length - 1; i >= 0; i-- )
-    {
-      const btn = this.buttons[ i ];
-      if ( x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h )
-      {
-        btn.onClick();
-        handled = true;
-        break;
-      }
-    }
+    // 首先使用ButtonManager处理按钮点击
+    handled = this.buttonManager.handleClick(x, y);
 
     // 处理设置界面的特殊输入
     if ( !handled && state === 'SETTINGS' )
@@ -469,35 +464,68 @@ export class MenuSystem
   private setupMainMenu (): void
   {
     this.buttons = [];
+    this.buttonManager.clear();
+    
     const btnW = 220;
     const btnH = 60;
     const centerX = ( this.width - btnW ) / 2;
     const startY = this.height * 0.5;
     const gap = 20;
 
-    this.addButton( "start_game", "开始游戏", centerX, startY, btnW, btnH, () =>
-    {
-      if ( this.onStart ) this.onStart();
-    } );
+    // 定义按钮样式
+    const buttonStyle: Partial<TextButtonStyle> = {
+      backgroundColor: this.colors.secondary,
+      primaryColor: this.colors.primary,
+      accentColor: this.colors.accent
+    };
 
-    this.addButton( "settings", "游戏设置", centerX, startY + btnH + gap, btnW, btnH, () =>
-    {
-      this.showSettings();
-      if ( this.onSettings ) this.onSettings();
-
-    } );
-
-    this.addButton( "store", "积分商店", centerX, startY + ( btnH + gap ) * 2, btnW, btnH, () =>
-    {
-      this.showStore();
-      if ( this.onStore ) this.onStore();
-    } );
-
-    this.addButton( "help", "游戏说明", centerX, startY + ( btnH + gap ) * 3, btnW, btnH, () =>
-    {
-      this.showHelpMenu();
-      if ( this.onHelp ) this.onHelp();
-    } );
+    // 使用ButtonManager创建按钮
+    this.buttonManager.addButtons([
+      {
+        id: "start_game",
+        x: centerX,
+        y: startY,
+        width: btnW,
+        height: btnH,
+        text: "开始游戏",
+        onClick: () => {
+          if ( this.onStart ) this.onStart();
+        }
+      },
+      {
+        id: "help",
+        x: centerX,
+        y: startY + btnH + gap,
+        width: btnW,
+        height: btnH,
+        text: "游戏说明",
+        onClick: () => {
+          if ( this.onHelp ) this.onHelp();
+        }
+      },
+      {
+        id: "store",
+        x: centerX,
+        y: startY + ( btnH + gap ) * 2,
+        width: btnW,
+        height: btnH,
+        text: "积分商店",
+        onClick: () => {
+          if ( this.onStore ) this.onStore();
+        }
+      },
+      {
+        id: "settings",
+        x: centerX,
+        y: startY + ( btnH + gap ) * 3,
+        width: btnW,
+        height: btnH,
+        text: "游戏设置",
+        onClick: () => {
+          if ( this.onSettings ) this.onSettings();
+        }
+      }
+    ], buttonStyle);
   }
 
   private setupSettingsMenu (): void

@@ -14,15 +14,16 @@
       "wx"
     ],
     "module": "commonjs",
-    "outDir": "./src",
-    "rootDir": "./src",
+    "outDir": "./",
+    "rootDir": "./",
     "strict": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "mytsglib/**/*"
   ],
   "exclude": [
     "node_modules",
