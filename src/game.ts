@@ -320,28 +320,60 @@ class RetroMarbleGame {
     // 绘制拖拽线（从事件管理器获取拖拽状态）
     const dragState = this.eventManager.getDragState();
     if (dragState.isDragging && dragState.dragStart && dragState.dragEnd) {
-      ctx.strokeStyle = '#2ecc71';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(dragState.dragStart.x, dragState.dragStart.y);
-      ctx.lineTo(dragState.dragEnd.x, dragState.dragEnd.y);
-      ctx.stroke();
-
       const dx = dragState.dragStart.x - dragState.dragEnd.x;
       const dy = dragState.dragStart.y - dragState.dragEnd.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       const power = Math.min(dist, 200) / 200;
 
+      // 绘制瞄准辅助线
+      ctx.strokeStyle = '#2ecc71';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([10, 5]);
+      ctx.beginPath();
+      ctx.moveTo(dragState.dragStart.x, dragState.dragStart.y);
+      ctx.lineTo(dragState.dragEnd.x, dragState.dragEnd.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 绘制预测轨迹点
+      const trajectoryPoints = this.calculateTrajectory(dragState.dragStart, { x: dx, y: dy }, power * 500);
+      trajectoryPoints.forEach((point, index) => {
+        const alpha = 1 - (index / trajectoryPoints.length) * 0.7;
+        ctx.fillStyle = `rgba(46, 204, 113, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // 绘制力量指示器
+      const powerBarX = databus.config.WIDTH - 50;
+      const powerBarY = 50;
+      const powerBarHeight = 150;
+      
+      // 背景框
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(powerBarX - 5, powerBarY - 5, 30, powerBarHeight + 10);
+      
+      // 力量条
+      ctx.fillStyle = '#e74c3c';
+      ctx.fillRect(powerBarX, powerBarY + (1 - power) * powerBarHeight, 20, power * powerBarHeight);
+      
+      // 边框
+      ctx.strokeStyle = '#ecf0f1';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(powerBarX, powerBarY, 20, powerBarHeight);
+      
+      // 力量文字
+      ctx.fillStyle = '#ecf0f1';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${Math.round(power * 100)}%`, powerBarX + 10, powerBarY - 10);
+
+      // 绘制发射点
       ctx.fillStyle = `rgb(${Math.floor(power * 255)}, ${Math.floor((1 - power) * 255)}, 0)`;
       ctx.beginPath();
-      ctx.arc(dragState.dragEnd.x, dragState.dragEnd.y, 10, 0, Math.PI * 2);
+      ctx.arc(dragState.dragEnd.x, dragState.dragEnd.y, 8, 0, Math.PI * 2);
       ctx.fill();
-
-      // 绘制力量条
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(databus.config.WIDTH - 30, 20, 20, 100);
-      ctx.fillStyle = '#2ecc71';
-      ctx.fillRect(databus.config.WIDTH - 30, 20 + (1 - power) * 100, 20, power * 100);
     }
 
     // 绘制"一扎"范围
@@ -382,6 +414,41 @@ class RetroMarbleGame {
       // 显示一扎距离
       ctx.fillText(`一扎: ${databus.handSpan}px`, infoConfig.x, UIAdapter.getInfoLineY(6));
     }
+  }
+
+  /**
+   * 计算弹珠预测轨迹
+   */
+  private calculateTrajectory(startPos: { x: number; y: number }, velocity: { x: number; y: number }, force: number): { x: number; y: number }[] {
+    const points: { x: number; y: number }[] = [];
+    const maxPoints = 20;
+    const dt = 0.016; // 60fps
+    let x = startPos.x;
+    let y = startPos.y;
+    let vx = velocity.x * force * 0.001;
+    let vy = velocity.y * force * 0.001;
+
+    for (let i = 0; i < maxPoints; i++) {
+      // 应用重力
+      vy += databus.gravity * dt;
+      // 应用空气阻力
+      vx *= databus.airResistance;
+      vy *= databus.airResistance;
+      
+      // 更新位置
+      x += vx * dt * 60;
+      y += vy * dt * 60;
+      
+      // 添加到轨迹点
+      points.push({ x, y });
+      
+      // 检查边界碰撞
+      if (x < 0 || x > databus.config.WIDTH || y < 0 || y > databus.config.HEIGHT) {
+        break;
+      }
+    }
+    
+    return points;
   }
 
   private lastTime: number = 0;

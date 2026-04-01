@@ -336,13 +336,17 @@ export default class EventManager
       player.vx = Math.cos( angle ) * force * 0.5;
       player.vy = Math.sin( angle ) * force * 0.5;
 
+      // 记录发射信息用于调试
+      console.log( `发射弹珠: 力量=${force.toFixed(1)}, 角度=${(angle * 180 / Math.PI).toFixed(1)}°` );
+
       // 切换到移动状态并重置回合计时器
       this.main.setState( GameState.MOVING );
       this.main.resetTurnTimer();
+    } else {
+      // 拖拽距离太小，返回游戏状态
+      this.main.setState( GameState.PLAYING );
+      console.log( '拖拽距离太小，取消发射' );
     }
-
-    // 返回游戏状态
-    // this.main.setState( GameState.PLAYING );
   }
 
   /**
@@ -387,21 +391,75 @@ export default class EventManager
     const dy = player.y - enemy.y;
     const dist = Math.sqrt( dx * dx + dy * dy );
 
-    // 计算发射力量（随距离增加，但有上限）
-    const force = Math.min( 600, dist * 1.5 );
+    // 根据难度等级调整AI精度
+    const difficulty = this.getAIDifficulty();
+    let error = 0;
+    let forceMultiplier = 1;
+
+    switch ( difficulty ) {
+      case 'easy':
+        error = ( Math.random() - 0.5 ) * 0.6; // 较大误差
+        forceMultiplier = 0.8; // 力量较小
+        break;
+      case 'medium':
+        error = ( Math.random() - 0.5 ) * 0.3; // 中等误差
+        forceMultiplier = 1.0; // 标准力量
+        break;
+      case 'hard':
+        error = ( Math.random() - 0.5 ) * 0.15; // 较小误差
+        forceMultiplier = 1.2; // 力量较大
+        break;
+    }
+
+    // 计算基础发射力量
+    const baseForce = Math.min( 600, dist * 1.5 ) * forceMultiplier;
     const angle = Math.atan2( dy, dx );
 
-    // 添加一些随机误差，使AI不那么完美
-    const error = ( Math.random() - 0.5 ) * 0.3;
-    const finalAngle = angle + error;
+    // 添加智能预测 - 预测玩家可能的位置
+    const predictedPlayerPos = this.predictPlayerPosition( player, enemy );
+    const predictedDx = predictedPlayerPos.x - enemy.x;
+    const predictedDy = predictedPlayerPos.y - enemy.y;
+    const predictedAngle = Math.atan2( predictedDy, predictedDy );
+
+    // 混合使用直接瞄准和预测瞄准
+    const finalAngle = angle * 0.7 + predictedAngle * 0.3 + error;
 
     // 应用力量到敌人弹珠
-    enemy.vx = Math.cos( finalAngle ) * force * 0.5;
-    enemy.vy = Math.sin( finalAngle ) * force * 0.5;
+    enemy.vx = Math.cos( finalAngle ) * baseForce * 0.5;
+    enemy.vy = Math.sin( finalAngle ) * baseForce * 0.5;
+
+    // 记录AI决策信息
+    console.log( `AI发射: 难度=${difficulty}, 力量=${baseForce.toFixed(1)}, 角度=${(finalAngle * 180 / Math.PI).toFixed(1)}°` );
 
     // 切换到移动状态并重置回合计时器
     this.main.setState( GameState.MOVING );
     this.main.resetTurnTimer();
+  }
+
+  /**
+   * 获取AI难度等级
+   */
+  private getAIDifficulty (): string {
+    // 可以根据玩家等级或游戏设置返回不同难度
+    if ( this.databus.playerGrade < 3 ) return 'easy';
+    if ( this.databus.playerGrade < 6 ) return 'medium';
+    return 'hard';
+  }
+
+  /**
+   * 预测玩家位置
+   */
+  private predictPlayerPosition ( player: any, enemy: any ): { x: number; y: number } {
+    // 简单的位置预测 - 基于当前速度和方向
+    const predictionTime = 0.5; // 预测0.5秒后的位置
+    const predictedX = player.x + player.vx * predictionTime * 10;
+    const predictedY = player.y + player.vy * predictionTime * 10;
+
+    // 确保预测位置在游戏边界内
+    const boundedX = Math.max( player.radius, Math.min( this.databus.config.WIDTH - player.radius, predictedX ) );
+    const boundedY = Math.max( player.radius, Math.min( this.databus.config.HEIGHT - player.radius, predictedY ) );
+
+    return { x: boundedX, y: boundedY };
   }
 
   /**
