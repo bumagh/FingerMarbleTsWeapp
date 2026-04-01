@@ -8,6 +8,7 @@ import UIAdapter from '../mytsglib/core/utils/ui/UIAdapter'
 import ShareManager from './share';
 import ToastManager from './toast';
 import ErrorHandler, { ErrorLevel } from './errorhandler';
+import { SkillManager } from './skills';
 const canvas = wx.createCanvas();
 const ctx = canvas.getContext('2d');
 
@@ -28,6 +29,7 @@ class RetroMarbleGame {
   private physics: PhysicsEngine;
   private menu: MenuSystem;
   private eventManager: EventManager;
+  private skillManager: SkillManager;
 
   // 添加菜单状态变量
   private menuState: MenuState = 'MAIN';
@@ -48,6 +50,9 @@ class RetroMarbleGame {
       // 初始化事件管理器
       this.eventManager = new EventManager(this, canvas, this.menu);
       this.eventManager.init();
+
+      // 初始化技能管理器
+      this.skillManager = new SkillManager();
 
       // 初始化分享功能
       ShareManager;
@@ -175,6 +180,9 @@ class RetroMarbleGame {
         this.eventManager.executeAITurn();
       }
     }
+
+    // 更新技能系统
+    this.skillManager.update(dt);
   }
 
   private render(): void {
@@ -389,6 +397,9 @@ class RetroMarbleGame {
         ctx.setLineDash([]);
       }
     }
+
+    // 渲染技能效果
+    this.skillManager.render(ctx);
 
     // 绘制UI - 只在游戏进行中显示
     if (this.state !== GameState.MENU && this.state !== GameState.GAME_OVER) {

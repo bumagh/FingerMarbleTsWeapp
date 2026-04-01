@@ -66,11 +66,18 @@ export class PhysicsEngine {
     this.checkWorldBounds(body);
   }
 
-  // 检测两点距离是否在阈值内（核心玩法：“一扎”距离）
+  // 检测两点距离是否在阈值内（核心玩法："一扎"距离）
   public checkDistance(b1: PhysicsBody, b2: PhysicsBody, threshold: number): boolean {
     const dx = b1.x - b2.x;
     const dy = b1.y - b2.y;
-    return (dx * dx + dy * dy) <= (threshold * threshold);
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // 考虑弹珠半径
+    const radius1 = b1.type === 'circle' ? (b1 as any).radius || 0 : 0;
+    const radius2 = b2.type === 'circle' ? (b2 as any).radius || 0 : 0;
+    const actualDistance = distance - radius1 - radius2;
+    
+    return actualDistance <= threshold;
   }
 
   // 边界处理
@@ -177,5 +184,38 @@ export class PhysicsEngine {
         if (c.onCollide) c.onCollide(r, Math.abs(dot * 2));
       }
     }
+  }
+
+  /**
+   * 获取两个物体之间的实际距离
+   */
+  public getDistance(body1: PhysicsBody, body2: PhysicsBody): number {
+    const dx = body1.x - body2.x;
+    const dy = body1.y - body2.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // 考虑弹珠半径
+    const radius1 = body1.type === 'circle' ? (body1 as any).radius || 0 : 0;
+    const radius2 = body2.type === 'circle' ? (body2 as any).radius || 0 : 0;
+    
+    return distance - radius1 - radius2;
+  }
+
+  /**
+   * 检查物体是否在边界外
+   */
+  public isOutOfBounds(body: PhysicsBody): boolean {
+    const margin = (body.type === 'circle' ? (body as any).radius || 0 : 0);
+    return body.x < -margin || 
+           body.x > this.bounds.width + margin ||
+           body.y < -margin || 
+           body.y > this.bounds.height + margin;
+  }
+
+  /**
+   * 检查物体是否静止
+   */
+  public isStationary(body: PhysicsBody, threshold: number = 0.1): boolean {
+    return Math.abs(body.vx) < threshold && Math.abs(body.vy) < threshold;
   }
 }
