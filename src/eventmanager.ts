@@ -1,6 +1,6 @@
 // src/eventmanager.ts
 import { Vector } from "./physics";
-import { MenuSystem, MenuState } from "./menu";
+import { MenuSystem, MenuState, MarbleType } from "./menu";
 import DataBus from './databus';
 import RetroMarbleGame from "./game";
 // 游戏状态枚举
@@ -71,26 +71,31 @@ export default class EventManager
       console.log( '重新开始' );
       this.main.setState( GameState.PLAYING );
       this.main.resetGame();
+      this.menu.showMainMenu();
     };
 
     this.menu.onHelp = () =>
     {
       console.log( '显示帮助' );
+      this.menu.showHelpMenu();
       this.main.setMenuState( 'HELP' );
     };
     this.menu.onStore = () =>
     {
       console.log( '显示商店' );
+      this.menu.showStore();
       this.main.setMenuState( 'STORE' );
     };
     this.menu.onSettings = () =>
     {
-      console.log( '显示商店' );
+      console.log( '显示设置' );
+      this.menu.showSettings();
       this.main.setMenuState( 'SETTINGS' );
     };
     this.menu.onBackToMenu = () =>
     {
       console.log( '返回主菜单' );
+      this.menu.showMainMenu();
       this.main.setMenuState( 'MAIN' );
     };
     // 新增设置变更回调
@@ -153,11 +158,9 @@ export default class EventManager
     };
   }
   // 辅助方法：获取弹珠信息
-  private getMarbleInfo ( marbleId: string ): any
+  private getMarbleInfo ( marbleId: string ): MarbleType | undefined
   {
-    // 这里需要访问菜单系统的弹珠数据
-    // 可能需要通过 main 实例来访问
-    return this.menu.marbleStore.forEach( ( e ) => e.id == marbleId );
+    return this.menu.marbleStore.find( ( e ) => e.id === marbleId );
   }
   // 调整游戏难度
   private adjustDifficulty ( level: string ): void

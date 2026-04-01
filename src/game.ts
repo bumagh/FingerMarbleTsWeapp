@@ -3,8 +3,10 @@ import { PhysicsBody, PhysicsEngine } from "./physics";
 import { MenuSystem, MenuState } from "./menu";
 import DataBus, { GameBall, GameObstacle } from "./databus";
 import EventManager from "./eventmanager";
-import { getScreenInfo } from '../mytsglib/core/utils/screen/screenUtils'
-import { initWechatShare } from "../mytsglib/core/utils/shareUtils"
+import { getScreenInfo } from './screen'
+import ShareManager from './share';
+import ToastManager from './toast';
+import ErrorHandler, { ErrorLevel } from './errorhandler';
 const canvas = wx.createCanvas();
 const ctx = canvas.getContext('2d');
 
@@ -30,19 +32,33 @@ class RetroMarbleGame {
   private menuState: MenuState = 'MAIN';
 
   constructor() {
-    // 初始化物理引擎
-    this.physics = new PhysicsEngine(databus.config.WIDTH, databus.config.HEIGHT);
-    // 初始化菜单系统
-    this.menu = new MenuSystem(ctx, canvas);
+    try {
+      // 初始化错误处理系统
+      ErrorHandler.init();
+      
+      // 初始化 Toast 系统
+      ToastManager.init(ctx, canvas);
+      
+      // 初始化物理引擎
+      this.physics = new PhysicsEngine(databus.config.WIDTH, databus.config.HEIGHT);
+      // 初始化菜单系统
+      this.menu = new MenuSystem(ctx, canvas);
 
-    // 初始化事件管理器
-    this.eventManager = new EventManager(this, canvas, this.menu);
-    this.eventManager.init();
+      // 初始化事件管理器
+      this.eventManager = new EventManager(this, canvas, this.menu);
+      this.eventManager.init();
 
-    // initWechatShare();
-    // 初始化游戏
-    this.resetGame();
-    this.gameLoop();
+      // 初始化分享功能
+      ShareManager;
+      
+      // 初始化游戏
+      this.resetGame();
+      this.gameLoop();
+      
+      ToastManager.success('游戏初始化成功');
+    } catch (error) {
+      ErrorHandler.handleError(error as Error, ErrorLevel.CRITICAL, 'Game Initialization');
+    }
   }
 
   public resetGame(): void {
@@ -50,6 +66,8 @@ class RetroMarbleGame {
     databus.reset();
     var info = getScreenInfo();
     databus.initConfig(info.width, info.height);
+    // 同步更新物理引擎边界
+    this.physics = new PhysicsEngine(databus.config.WIDTH, databus.config.HEIGHT);
     // 重置游戏状态
     this.turn = Math.random() > 0.5 ? Turn.PLAYER : Turn.AI;
     this.turnTimer = databus.config.TURN_TIME;
@@ -159,20 +177,25 @@ class RetroMarbleGame {
   }
 
   private render(): void {
-    // 清空画布
-    ctx.clearRect(0, 0, databus.config.WIDTH, databus.config.HEIGHT);
+    try {
+      // 清空画布
+      ctx.clearRect(0, 0, databus.config.WIDTH, databus.config.HEIGHT);
 
-    // 首先渲染游戏场景（无论什么状态都渲染背景和游戏元素）
-    this.renderGame();
+      // 根据游戏状态决定渲染内容
+      if (this.state === GameState.MENU || this.state === GameState.GAME_OVER) {
+        // 菜单状态：只渲染菜单，不渲染游戏场景
+        this.menu.render(this.menuState, databus.score);
+      } else {
+        // 游戏状态：渲染游戏场景和UI按钮
+        this.renderGame();
+        this.renderRestartButton();
+        this.renderExitButton();
+      }
 
-    // 然后在顶部渲染菜单（如果有）
-    // 渲染菜单（如果需要）
-    if (this.state === GameState.MENU || this.state === GameState.GAME_OVER) {
-      this.menu.render(this.menuState);
-    } else {
-      // 添加重新开始按钮和退出按钮
-      this.renderRestartButton();
-      this.renderExitButton();
+      // 渲染 Toast 消息（始终在最上层）
+      ToastManager.render();
+    } catch (error) {
+      ErrorHandler.handleError(error as Error, ErrorLevel.ERROR, 'Game Render');
     }
   }
 
@@ -400,6 +423,24 @@ class RetroMarbleGame {
     this.menuState = state;
     if (state !== 'NONE') {
       this.state = GameState.MENU;
+      
+      // 添加状态切换提示
+      switch (state) {
+        case 'STORE':
+          ToastManager.info('进入积分商店');
+          break;
+        case 'SETTINGS':
+          ToastManager.info('进入游戏设置');
+          break;
+        case 'HELP':
+          ToastManager.info('查看游戏说明');
+          break;
+        case 'MAIN':
+          ToastManager.info('返回主菜单');
+          break;
+        default:
+          break;
+      }
     }
   }
 
@@ -471,6 +512,42 @@ class RetroMarbleGame {
     this.menuState = 'MAIN';
     this.resetGame();
   }
+
+  // 添加分享方法
+  public shareScore(): void {
+    ShareManager.shareScore(databus.score, databus.playerGrade)
+      .then(() => {
+        console.log('分享成功');
+      })
+      .catch((error: any) => {
+        console.error('分享失败:', error);
+      });
+  }
+
+  public shareVictory(): void {
+    ShareManager.shareVictory()
+      .then(() => {
+        console.log('胜利分享成功');
+      })
+      .catch((error: any) => {
+        console.error('胜利分享失败:', error);
+      });
+  }
+
+  public shareMarbleUnlock(marbleName: string): void {
+    ShareManager.shareMarbleUnlock(marbleName)
+      .then(() => {
+        console.log('弹珠解锁分享成功');
+      })
+      .catch((error: any) => {
+        console.error('弹珠解锁分享失败:', error);
+      });
+  }
 }
 
 export default RetroMarbleGame;
+
+// 微信小游戏需要 CommonJS 导出
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = RetroMarbleGame;
+}

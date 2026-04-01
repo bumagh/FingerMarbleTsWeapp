@@ -2,6 +2,7 @@
 import { Vector } from "./physics";
 import { TextButton, TextButtonStyle, ButtonConfig } from "./ui/TextButton";
 import { ButtonManager } from "./ui/ButtonManager";
+import DataBus from './databus';
 
 // 扩展 MenuState 类型
 export type MenuState = 'MAIN' | 'HELP' | 'GAME_OVER' | 'SETTINGS' | 'STORE' | 'NONE';
@@ -186,7 +187,32 @@ export class MenuSystem
     this.width = canvas.width;
     this.height = canvas.height;
     this.buttonManager = new ButtonManager(ctx);
+    
+    // 从 DataBus 同步弹珠解锁状态
+    this.syncMarbleUnlocksFromDataBus();
+    
     this.showMainMenu();
+  }
+
+  // 从 DataBus 同步弹珠解锁状态
+  private syncMarbleUnlocksFromDataBus (): void
+  {
+    const databusUnlocks = DataBus.getMarbleUnlocks();
+    
+    // 更新本地弹珠商店的解锁状态
+    this.marbleStore.forEach( marble => {
+      if ( databusUnlocks[marble.id] )
+      {
+        marble.unlocked = true;
+      }
+    } );
+    
+    // 确保 DataBus 中有当前弹珠商店的解锁状态
+    const menuUnlocks: { [key: string]: boolean } = {};
+    this.marbleStore.forEach( marble => {
+      menuUnlocks[marble.id] = marble.unlocked;
+    });
+    DataBus.syncMarbleUnlocksFromMenu( menuUnlocks );
   }
 
   // 获取设置值
@@ -217,6 +243,8 @@ export class MenuSystem
     if ( marble )
     {
       marble.unlocked = true;
+      // 同步到 DataBus
+      DataBus.unlockMarble( marbleId );
     }
   }
 
@@ -243,9 +271,14 @@ export class MenuSystem
 
     this.ctx.save();
 
-    // 绘制背景
+    // 绘制背景 - 确保完全覆盖游戏场景
     if ( state === 'MAIN' || state === 'HELP' || state === 'SETTINGS' || state === 'STORE' )
     {
+      // 使用完全不透明的深色背景强制覆盖
+      this.ctx.fillStyle = '#000000';
+      this.ctx.fillRect( 0, 0, this.width, this.height );
+      
+      // 再绘制菜单背景
       this.ctx.fillStyle = this.colors.secondary;
       this.ctx.fillRect( 0, 0, this.width, this.height );
       this.drawOrnamentalBorder();
@@ -531,6 +564,7 @@ export class MenuSystem
   private setupSettingsMenu (): void
   {
     this.buttons = [];
+    this.buttonManager.clear();
     const btnW = 140;
     const btnH = 50;
 
@@ -545,6 +579,7 @@ export class MenuSystem
   private setupStoreMenu (): void
   {
     this.buttons = [];
+    this.buttonManager.clear();
     const btnW = 140;
     const btnH = 50;
 
@@ -559,6 +594,7 @@ export class MenuSystem
   private setupHelpMenu (): void
   {
     this.buttons = [];
+    this.buttonManager.clear();
     const btnW = 140;
     const btnH = 50;
 
@@ -573,6 +609,7 @@ export class MenuSystem
   private setupGameOverMenu ( win: boolean ): void
   {
     this.buttons = [];
+    this.buttonManager.clear();
     const btnW = 200;
     const btnH = 55;
     const centerX = ( this.width - btnW ) / 2;
@@ -605,6 +642,15 @@ export class MenuSystem
   private addButton ( id: string, text: string, x: number, y: number, w: number, h: number, onClick: () => void ): void
   {
     this.buttons.push( { id, text, x, y, w, h, onClick } );
+    this.buttonManager.addButtonFromConfig( {
+      id,
+      x,
+      y,
+      width: w,
+      height: h,
+      text,
+      onClick
+    } );
   }
 
   // --- 绘图辅助方法 ---

@@ -65,6 +65,3 @@ wx.togglePause = function() {
     game.togglePause();
   }
 };
-
-// 游戏启动
-game = new RetroMarbleGame();

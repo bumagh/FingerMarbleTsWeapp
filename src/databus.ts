@@ -123,6 +123,9 @@ class DataBus
   public handSpan: number = 20; // "一扎"距离
   public maxForce: number = 18000;
 
+  // 弹珠解锁状态管理
+  private marbleUnlocks: { [key: string]: boolean } = {};
+
   // 游戏配置（为了集中管理）
   public config = {
     WIDTH: 375,
@@ -166,6 +169,29 @@ class DataBus
     this.saveToLocal();
   }
 
+  // 弹珠解锁状态管理
+  public isMarbleUnlocked ( marbleId: string ): boolean
+  {
+    return this.marbleUnlocks[marbleId] || false;
+  }
+
+  public unlockMarble ( marbleId: string ): void
+  {
+    this.marbleUnlocks[marbleId] = true;
+    this.saveToLocal();
+  }
+
+  public getMarbleUnlocks (): { [key: string]: boolean }
+  {
+    return { ...this.marbleUnlocks };
+  }
+
+  public syncMarbleUnlocksFromMenu ( menuUnlocks: { [key: string]: boolean } ): void
+  {
+    this.marbleUnlocks = { ...menuUnlocks };
+    this.saveToLocal();
+  }
+
   // 本地存储相关
   private saveToLocal (): void
   {
@@ -173,7 +199,12 @@ class DataBus
     {
       wx.setStorageSync( 'score', this.score );
       wx.setStorageSync( 'currentMarble', this.currentMarble );
-      // 可以保存更多数据...
+      wx.setStorageSync( 'playerGrade', this.playerGrade );
+      wx.setStorageSync( 'playerExp', this.playerExp );
+      // 保存弹珠解锁状态
+      wx.setStorageSync( 'marbleUnlocks', this.marbleUnlocks );
+      // 保存最后领取时间
+      wx.setStorageSync( 'lastClaimTime', this.lastClaimTime );
     }
   }
 
@@ -191,6 +222,31 @@ class DataBus
       if ( savedMarble !== undefined )
       {
         this.currentMarble = savedMarble;
+      }
+
+      const savedGrade = wx.getStorageSync( 'playerGrade' );
+      if ( savedGrade !== undefined )
+      {
+        this.playerGrade = Number( savedGrade ) || 1;
+      }
+
+      const savedExp = wx.getStorageSync( 'playerExp' );
+      if ( savedExp !== undefined )
+      {
+        this.playerExp = Number( savedExp ) || 0;
+      }
+
+      const savedClaimTime = wx.getStorageSync( 'lastClaimTime' );
+      if ( savedClaimTime !== undefined )
+      {
+        this.lastClaimTime = Number( savedClaimTime ) || 0;
+      }
+
+      // 加载弹珠解锁状态
+      const marbleUnlocks = wx.getStorageSync( 'marbleUnlocks' );
+      if ( marbleUnlocks !== undefined )
+      {
+        this.marbleUnlocks = { ...marbleUnlocks };
       }
     }
   }
@@ -477,3 +533,8 @@ class DataBus
 
 // 导出单例
 export default DataBus.getInstance();
+
+// 微信小游戏需要 CommonJS 导出
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = DataBus.getInstance();
+}
