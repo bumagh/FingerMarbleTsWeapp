@@ -139,6 +139,9 @@ export class ErrorHandler {
    * 显示用户提示
    */
   private showUserMessage(errorInfo: ErrorInfo): void {
+    // 暂时关闭 Toast 显示
+    return;
+    
     if (!this.toastManager.isInitialized()) return;
 
     const userMessage = this.getUserFriendlyMessage(errorInfo);

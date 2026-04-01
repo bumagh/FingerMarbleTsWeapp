@@ -30,6 +30,9 @@
     "assets",
     "js",
     "src/**/*.js",
-    "game.js"
+    "game.js",
+    "mytsglib/test/**/*",
+    "mytsglib/common/**/*",
+    "mytsglib/gameplay/**/*"
   ]
 }

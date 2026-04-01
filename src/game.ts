@@ -3,7 +3,7 @@ import { PhysicsBody, PhysicsEngine } from "./physics";
 import { MenuSystem, MenuState } from "./menu";
 import DataBus, { GameBall, GameObstacle } from "./databus";
 import EventManager from "./eventmanager";
-import { getScreenInfo } from './screen'
+import { getScreenInfo } from '../mytsglib/core/utils/screen/screenUtils'
 import ShareManager from './share';
 import ToastManager from './toast';
 import ErrorHandler, { ErrorLevel } from './errorhandler';
@@ -55,7 +55,7 @@ class RetroMarbleGame {
       this.resetGame();
       this.gameLoop();
       
-      ToastManager.success('游戏初始化成功');
+      // ToastManager.success('游戏初始化成功');
     } catch (error) {
       ErrorHandler.handleError(error as Error, ErrorLevel.CRITICAL, 'Game Initialization');
     }
@@ -193,7 +193,7 @@ class RetroMarbleGame {
       }
 
       // 渲染 Toast 消息（始终在最上层）
-      ToastManager.render();
+      // ToastManager.render();
     } catch (error) {
       ErrorHandler.handleError(error as Error, ErrorLevel.ERROR, 'Game Render');
     }
@@ -427,16 +427,16 @@ class RetroMarbleGame {
       // 添加状态切换提示
       switch (state) {
         case 'STORE':
-          ToastManager.info('进入积分商店');
+          // ToastManager.info('进入积分商店');
           break;
         case 'SETTINGS':
-          ToastManager.info('进入游戏设置');
+          // ToastManager.info('进入游戏设置');
           break;
         case 'HELP':
-          ToastManager.info('查看游戏说明');
+          // ToastManager.info('查看游戏说明');
           break;
         case 'MAIN':
-          ToastManager.info('返回主菜单');
+          // ToastManager.info('返回主菜单');
           break;
         default:
           break;
