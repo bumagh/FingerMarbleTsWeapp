@@ -4,6 +4,7 @@ import { MenuSystem, MenuState } from "./menu";
 import DataBus, { GameBall, GameObstacle } from "./databus";
 import EventManager from "./eventmanager";
 import { getScreenInfo } from '../mytsglib/core/utils/screen/screenUtils'
+import UIAdapter from '../mytsglib/core/utils/ui/UIAdapter'
 import ShareManager from './share';
 import ToastManager from './toast';
 import ErrorHandler, { ErrorLevel } from './errorhandler';
@@ -201,19 +202,17 @@ class RetroMarbleGame {
 
   // 添加新的渲染方法
   private renderRestartButton(): void {
-    const buttonWidth = 100;
-    const buttonHeight = 40;
-    const buttonX = 20; // 移到左上角
-    const buttonY = 20;
+    const layoutConfig = UIAdapter.getLayoutConfig();
+    const buttonConfig = layoutConfig.buttons.topLeft;
 
     // 绘制按钮背景
     ctx.fillStyle = 'rgba(231, 76, 60, 0.8)'; // 红色
-    ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+    ctx.fillRect(buttonConfig.x, buttonConfig.y, buttonConfig.width, buttonConfig.height);
 
     // 绘制按钮边框
     ctx.strokeStyle = '#ecf0f1';
     ctx.lineWidth = 2;
-    ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
+    ctx.strokeRect(buttonConfig.x, buttonConfig.y, buttonConfig.width, buttonConfig.height);
 
     // 绘制按钮文字
     ctx.fillStyle = '#ecf0f1';
@@ -222,34 +221,32 @@ class RetroMarbleGame {
     ctx.textBaseline = 'middle';
     ctx.fillText(
       '重新开始',
-      buttonX + buttonWidth / 2,
-      buttonY + buttonHeight / 2
+      buttonConfig.x + buttonConfig.width / 2,
+      buttonConfig.y + buttonConfig.height / 2
     );
 
     // 存储按钮位置信息用于点击检测
     this.restartButtonRect = {
-      x: buttonX,
-      y: buttonY,
-      width: buttonWidth,
-      height: buttonHeight
+      x: buttonConfig.x,
+      y: buttonConfig.y,
+      width: buttonConfig.width,
+      height: buttonConfig.height
     };
   }
 
   // 添加退出按钮渲染方法
   private renderExitButton(): void {
-    const buttonWidth = 80;
-    const buttonHeight = 40;
-    const buttonX = 20; // 移到左上角
-    const buttonY = 70; // 在重新开始按钮下方
+    const layoutConfig = UIAdapter.getLayoutConfig();
+    const buttonConfig = layoutConfig.buttons.topLeftSecond;
 
     // 绘制按钮背景
     ctx.fillStyle = 'rgba(52, 73, 94, 0.8)'; // 深灰色
-    ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+    ctx.fillRect(buttonConfig.x, buttonConfig.y, buttonConfig.width, buttonConfig.height);
 
     // 绘制按钮边框
     ctx.strokeStyle = '#ecf0f1';
     ctx.lineWidth = 2;
-    ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
+    ctx.strokeRect(buttonConfig.x, buttonConfig.y, buttonConfig.width, buttonConfig.height);
 
     // 绘制按钮文字
     ctx.fillStyle = '#ecf0f1';
@@ -258,16 +255,16 @@ class RetroMarbleGame {
     ctx.textBaseline = 'middle';
     ctx.fillText(
       '返回',
-      buttonX + buttonWidth / 2,
-      buttonY + buttonHeight / 2
+      buttonConfig.x + buttonConfig.width / 2,
+      buttonConfig.y + buttonConfig.height / 2
     );
 
     // 存储按钮位置信息用于点击检测
     this.exitButtonRect = {
-      x: buttonX,
-      y: buttonY,
-      width: buttonWidth,
-      height: buttonHeight
+      x: buttonConfig.x,
+      y: buttonConfig.y,
+      width: buttonConfig.width,
+      height: buttonConfig.height
     };
   }
 
@@ -363,23 +360,27 @@ class RetroMarbleGame {
 
     // 绘制UI - 只在游戏进行中显示
     if (this.state !== GameState.MENU && this.state !== GameState.GAME_OVER) {
+      const layoutConfig = UIAdapter.getLayoutConfig();
+      const infoConfig = layoutConfig.infoPanel;
+      
       ctx.fillStyle = '#ecf0f1';
-      ctx.font = '16px Arial';
+      ctx.font = `${infoConfig.fontSize}px Arial`;
       ctx.textAlign = 'left';
-      // 调整UI位置，避免与按钮重叠
-      ctx.fillText(`等级: ${databus.playerGrade}`, 120, 30);
-      ctx.fillText(`经验: ${databus.playerExp}/100`, 120, 55);
-      ctx.fillText(`积分: ${databus.score}`, 120, 80);
-      ctx.fillText(`回合: ${this.turn === Turn.PLAYER ? '玩家' : 'AI'}`, 120, 105);
-      ctx.fillText(`时间: ${Math.max(0, this.turnTimer).toFixed(1)}s`, 120, 130);
+      
+      // 使用 UIAdapter 的行位置
+      ctx.fillText(`等级: ${databus.playerGrade}`, infoConfig.x, UIAdapter.getInfoLineY(0));
+      ctx.fillText(`经验: ${databus.playerExp}/100`, infoConfig.x, UIAdapter.getInfoLineY(1));
+      ctx.fillText(`积分: ${databus.score}`, infoConfig.x, UIAdapter.getInfoLineY(2));
+      ctx.fillText(`回合: ${this.turn === Turn.PLAYER ? '玩家' : 'AI'}`, infoConfig.x, UIAdapter.getInfoLineY(3));
+      ctx.fillText(`时间: ${Math.max(0, this.turnTimer).toFixed(1)}s`, infoConfig.x, UIAdapter.getInfoLineY(4));
 
       // 显示下注金额
       if (databus.betAmount > 0) {
-        ctx.fillText(`下注: ${databus.betAmount}`, 120, 155);
+        ctx.fillText(`下注: ${databus.betAmount}`, infoConfig.x, UIAdapter.getInfoLineY(5));
       }
 
       // 显示一扎距离
-      ctx.fillText(`一扎: ${databus.handSpan}px`, 120, 180);
+      ctx.fillText(`一扎: ${databus.handSpan}px`, infoConfig.x, UIAdapter.getInfoLineY(6));
     }
   }
 
