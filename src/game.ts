@@ -22,6 +22,7 @@ enum Turn { PLAYER, AI }
 class RetroMarbleGame {
   private restartButtonRect: { x: number, y: number, width: number, height: number } | null = null;
   private exitButtonRect: { x: number, y: number, width: number, height: number } | null = null;
+  private skillButtonRects: { id: string, x: number, y: number, width: number, height: number }[] = [];
   private state: GameState = GameState.MENU;
   private turn: Turn = Turn.PLAYER;
   private turnTimer: number = databus.config.TURN_TIME;
@@ -424,7 +425,72 @@ class RetroMarbleGame {
 
       // 显示一扎距离
       ctx.fillText(`一扎: ${databus.handSpan}px`, infoConfig.x, UIAdapter.getInfoLineY(6));
+
+      // 绘制技能按钮
+      this.renderSkillButtons();
     }
+  }
+
+  // 添加技能按钮渲染方法
+  private renderSkillButtons(): void {
+    const skillButtonSize = 60;
+    const skillButtonSpacing = 10;
+    const skillButtonY = databus.config.HEIGHT - skillButtonSize - 20;
+    const skillButtons = [
+      { id: 'shockwave', name: '冲击波', color: '#e74c3c' },
+      { id: 'shield', name: '护盾', color: '#3498db' },
+      { id: 'teleport', name: '传送', color: '#9b59b6' },
+      { id: 'freeze', name: '冰冻', color: '#00bcd4' },
+      { id: 'speed', name: '加速', color: '#f39c12' }
+    ];
+
+    const totalWidth = skillButtons.length * skillButtonSize + (skillButtons.length - 1) * skillButtonSpacing;
+    const startX = (databus.config.WIDTH - totalWidth) / 2;
+
+    this.skillButtonRects = [];
+    
+    skillButtons.forEach((skill, index) => {
+      const x = startX + index * (skillButtonSize + skillButtonSpacing);
+      
+      // 检查技能是否在冷却中
+      const cooldown = this.skillManager.getCooldownRemaining(skill.id);
+      const isOnCooldown = cooldown > 0;
+      
+      // 绘制按钮背景
+      ctx.fillStyle = isOnCooldown ? 'rgba(100, 100, 100, 0.8)' : skill.color;
+      ctx.fillRect(x, skillButtonY, skillButtonSize, skillButtonSize);
+      
+      // 绘制按钮边框
+      ctx.strokeStyle = '#ecf0f1';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, skillButtonY, skillButtonSize, skillButtonSize);
+      
+      // 绘制技能名称
+      ctx.fillStyle = '#ecf0f1';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(skill.name, x + skillButtonSize / 2, skillButtonY + skillButtonSize / 2);
+      
+      // 如果在冷却中，显示冷却时间
+      if (isOnCooldown) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(x, skillButtonY, skillButtonSize, skillButtonSize);
+        
+        ctx.fillStyle = '#ecf0f1';
+        ctx.font = '16px Arial';
+        ctx.fillText(`${Math.ceil(cooldown)}s`, x + skillButtonSize / 2, skillButtonY + skillButtonSize / 2);
+      }
+      
+      // 存储按钮位置信息用于点击检测
+      this.skillButtonRects.push({
+        id: skill.id,
+        x: x,
+        y: skillButtonY,
+        width: skillButtonSize,
+        height: skillButtonSize
+      });
+    });
   }
 
   /**
@@ -583,6 +649,27 @@ class RetroMarbleGame {
   // 添加获取退出按钮信息的方法
   public getExitButtonRect(): { x: number, y: number, width: number, height: number } | null {
     return this.exitButtonRect;
+  }
+
+  // 添加获取技能按钮信息的方法
+  public getSkillButtonRects(): { id: string, x: number, y: number, width: number, height: number }[] {
+    return this.skillButtonRects || [];
+  }
+
+  // 添加技能激活方法
+  public activateSkill(skillId: string): boolean {
+    if (this.turn !== Turn.PLAYER || this.state !== GameState.PLAYING) {
+      console.log('只能在玩家回合且游戏进行中使用技能');
+      return false;
+    }
+
+    const playerBall = databus.getPlayerBall();
+    if (!playerBall) {
+      console.log('找不到玩家弹珠');
+      return false;
+    }
+
+    return this.skillManager.activateSkill(skillId, playerBall, null, this);
   }
 
   // 添加退出游戏的方法
