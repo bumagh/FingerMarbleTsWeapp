@@ -5,6 +5,11 @@
  * 管理弹珠技能的释放、效果和冷却
  */
 
+import DataBus from './databus';
+
+// 获取 DataBus 实例
+const databus = DataBus;
+
 export interface Skill {
   id: string;
   name: string;
@@ -51,7 +56,7 @@ export class SkillManager {
       manaCost: 20,
       onActivate: (user: any, target: any, game: any) => {
         const physics = game.getPhysicsEngine();
-        const allBalls = game.databus.getAllBalls();
+        const allBalls = databus.balls; // 直接访问databus
         
         allBalls.forEach(ball => {
           if (ball.id !== user.id) {
@@ -121,7 +126,7 @@ export class SkillManager {
       duration: 3,
       manaCost: 30,
       onActivate: (user: any, target: any, game: any) => {
-        const allBalls = game.databus.getAllBalls();
+        const allBalls = databus.balls; // 直接访问databus
         
         allBalls.forEach(ball => {
           if (ball.id !== user.id) {
@@ -135,7 +140,7 @@ export class SkillManager {
         console.log(`${user.id} 释放冰冻技能`);
       },
       onEnd: (user: any) => {
-        const allBalls = user.game?.databus?.getAllBalls();
+        const allBalls = databus.balls; // 直接访问databus
         if (allBalls) {
           allBalls.forEach(ball => {
             if (ball.id !== user.id) {

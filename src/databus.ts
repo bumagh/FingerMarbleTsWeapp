@@ -24,6 +24,12 @@ export interface GameBall
   finished?: boolean;
   finishTime?: number;
   onCollide?: ( other: any, force: number ) => void;
+  
+  // 技能相关属性
+  isFrozen?: boolean;
+  frozenEndTime?: number;
+  hasShield?: boolean;
+  shieldHealth?: number;
 }
 
 export interface GameObstacle
