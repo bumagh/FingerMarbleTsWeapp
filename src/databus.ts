@@ -346,7 +346,12 @@ class DataBus
     ball.isStatic = false;
     ball.restitution = 0.9;
     ball.friction = 0.01;
-    ball.color = type === 'player' ? this.config.BALL_COLORS.player : this.config.BALL_COLORS.enemy;
+    // 使用当前选择的弹珠颜色（仅对玩家弹珠）
+    if (type === 'player') {
+      ball.color = this.getCurrentMarbleColor();
+    } else {
+      ball.color = this.config.BALL_COLORS.enemy;
+    }
     ball.isPlayer = type === 'player';
     ball.isEnemy = type === 'enemy';
     ball.hasBet = false;
@@ -355,6 +360,37 @@ class DataBus
     ball.onCollide = onCollide;
 
     return ball;
+  }
+
+  /**
+   * 获取当前弹珠的颜色
+   */
+  public getCurrentMarbleColor(): string {
+    // 根据当前弹珠ID返回对应颜色
+    const marbleColors: { [key: string]: string } = {
+      'basic_red': '#B22222',
+      'ocean_blue': '#1E90FF',
+      'emerald_green': '#32CD32',
+      'golden_sun': '#FFD700',
+      'purple_magic': '#9370DB',
+      'fire_orange': '#FF4500',
+      'ice_cyan': '#00CED1',
+      'shadow_black': '#2F4F4F',
+      'rainbow': '#FF69B4'
+    };
+    
+    return marbleColors[this.currentMarble] || marbleColors['basic_red'];
+  }
+
+  /**
+   * 更新游戏中玩家弹珠的颜色
+   */
+  public updatePlayerMarbleColor(): void {
+    const playerBall = this.getPlayerBall();
+    if (playerBall) {
+      playerBall.color = this.getCurrentMarbleColor();
+      console.log(`更新玩家弹珠颜色为: ${playerBall.color}`);
+    }
   }
 
   /**

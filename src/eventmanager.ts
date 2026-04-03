@@ -154,7 +154,9 @@ export default class EventManager
     {
       console.log( `选择弹珠: ${ marbleId }` );
       this.databus.setCurrentMarble( marbleId );
-      // 可以在游戏中立即应用新弹珠外观
+      // 立即更新游戏中的弹珠颜色
+      this.databus.updatePlayerMarbleColor();
+      console.log( `弹珠皮肤已应用到游戏中` );
     };
   }
   // 辅助方法：获取弹珠信息
