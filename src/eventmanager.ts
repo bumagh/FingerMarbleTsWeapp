@@ -44,8 +44,8 @@ export default class EventManager {
   public init(): void {
     console.log('事件管理器初始化...');
     
-    // 初始化事件处理器
-    this.eventHandler.init();
+    // GameEventHandler 不需要单独的init方法
+    // this.eventHandler.init();
     
     console.log('事件管理器初始化完成');
   }
@@ -67,11 +67,11 @@ export default class EventManager {
    */
   private setupEventCallbacks(): void {
     // 游戏控制回调 - 直接调用main的方法
-    this.eventHandler.onStart = () => {
+    this.eventHandler.onGameStart = () => {
       this.main.resetGame();
     };
 
-    this.eventHandler.onRestart = () => {
+    this.eventHandler.onGameRestart = () => {
       this.main.resetGame();
       this.menu.showMainMenu();
     };
@@ -82,7 +82,7 @@ export default class EventManager {
       // 可以在这里添加设置处理逻辑
     };
 
-    // 弹珠相关回调
+    // 弹珠购买回调
     this.eventHandler.onMarblePurchase = (marbleId: string) => {
       console.log(`弹珠购买: ${marbleId}`);
       const marble = this.menu.marbleStore.find((item: MarbleType) => item.id === marbleId);
@@ -145,6 +145,38 @@ export default class EventManager {
   private handleExit(): void {
     console.log('退出游戏返回主菜单');
     this.main.exitGame();
+  }
+
+  /**
+   * 结束回合
+   */
+  public settleRound(): void {
+    this.eventHandler.settleRound();
+  }
+
+  /**
+   * 执行AI回合
+   */
+  public executeAITurn(): void {
+    this.eventHandler.executeAITurn();
+  }
+
+  /**
+   * 获取拖拽状态
+   */
+  public getDragState(): {
+    isDragging: boolean;
+    dragStart: { x: number; y: number } | null;
+    dragEnd: { x: number; y: number } | null;
+  } {
+    return this.eventHandler.getDragState();
+  }
+
+  /**
+   * 切换暂停/继续
+   */
+  public togglePause(): void {
+    this.eventHandler.togglePause();
   }
 
   /**

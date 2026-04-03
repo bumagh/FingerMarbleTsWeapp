@@ -102,28 +102,34 @@ export const MenuStateTransitions: Record<MenuState, MenuState[]> = {
 
 // 状态验证函数
 export function isValidGameStateTransition(from: GameState, to: GameState): boolean {
-  return GameStateTransitions[from]?.includes(to) || false;
+  const transitions = GameStateTransitions[from];
+  return transitions ? transitions.indexOf(to) !== -1 : false;
 }
 
 export function isValidMenuStateTransition(from: MenuState, to: MenuState): boolean {
-  return MenuStateTransitions[from]?.includes(to) || false;
+  const transitions = MenuStateTransitions[from];
+  return transitions ? transitions.indexOf(to) !== -1 : false;
 }
 
 // 状态类型守卫
 export function isGameState(value: string): value is GameState {
-  return Object.values(GameState).includes(value as GameState);
+  const gameStates = [GameState.MENU, GameState.PLAYING, GameState.AIMING, GameState.MOVING, GameState.SETTLING, GameState.GAME_OVER, GameState.PAUSED, GameState.PREVIEW, GameState.BETTING, GameState.FINISHED];
+  return gameStates.indexOf(value as GameState) !== -1;
 }
 
 export function isMenuState(value: string): value is MenuState {
-  return Object.values(MenuState).includes(value as MenuState);
+  const menuStates = [MenuState.MAIN, MenuState.HELP, MenuState.GAME_OVER, MenuState.SETTINGS, MenuState.STORE, MenuState.NONE];
+  return menuStates.indexOf(value as MenuState) !== -1;
 }
 
 export function isTurn(value: string): value is Turn {
-  return Object.values(Turn).includes(value as Turn);
+  const turns = [Turn.PLAYER, Turn.AI];
+  return turns.indexOf(value as Turn) !== -1;
 }
 
 export function isGameSubState(value: string): value is GameSubState {
-  return Object.values(GameSubState).includes(value as GameSubState);
+  const subStates = [GameSubState.IDLE, GameSubState.PREVIEW, GameSubState.BETTING, GameSubState.RUNNING, GameSubState.PAUSED, GameSubState.FINISHED];
+  return subStates.indexOf(value as GameSubState) !== -1;
 }
 
 // 状态字符串映射（用于调试和日志）

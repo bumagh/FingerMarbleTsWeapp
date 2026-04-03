@@ -580,8 +580,8 @@ class RetroMarbleGame {
         id: skill.id,
         x: x,
         y: skillButtonY,
-        width: 0,
-        height: 0
+        width: width,
+        height: skillButtonHeight
       });
     });
   }
