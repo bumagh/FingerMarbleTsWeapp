@@ -25,6 +25,9 @@ export interface PhysicsBody {
   isStatic: boolean;
   restitution: number; // 弹性系数 0-1
   friction: number;    // 摩擦系数 0-1
+  passThroughObstacleCount?: number;
+  bonusBounceCount?: number;
+  bonusBounceRestitution?: number;
   onCollide?: (other: PhysicsBody, force: number) => void; // 碰撞回调
 }
 
@@ -91,10 +94,20 @@ export class PhysicsEngine {
   }
 
   private reflect(body: PhysicsBody, axis: 'x' | 'y'): void {
-    if (axis === 'x') body.vx = -body.vx * body.restitution;
-    else body.vy = -body.vy * body.restitution;
+    const bounceMultiplier = this.consumeBounceBonus(body);
+    if (axis === 'x') body.vx = -body.vx * body.restitution * bounceMultiplier;
+    else body.vy = -body.vy * body.restitution * bounceMultiplier;
     // 触发边界碰撞事件（可选）
     if(body.onCollide) body.onCollide({ ...body, id: 'wall' } as PhysicsBody, Math.abs(axis === 'x' ? body.vx : body.vy));
+  }
+
+  private consumeBounceBonus(body: PhysicsBody): number {
+    if ((body.bonusBounceCount || 0) > 0) {
+      body.bonusBounceCount = (body.bonusBounceCount || 0) - 1;
+      return body.bonusBounceRestitution || 1.15;
+    }
+
+    return 1;
   }
 
   // 解决碰撞分发
@@ -170,6 +183,27 @@ export class PhysicsEngine {
     if (distSq < rad * rad && distSq > 0) {
       const dist = Math.sqrt(distSq);
       const nx = dx / dist, ny = dy / dist;
+
+      if ((c.passThroughObstacleCount || 0) > 0) {
+        c.passThroughObstacleCount = (c.passThroughObstacleCount || 0) - 1;
+
+        if (Math.abs(c.vx) >= Math.abs(c.vy)) {
+          if (c.vx >= 0) {
+            c.x = r.x + (r.width || 0) + rad + 1;
+          } else {
+            c.x = r.x - rad - 1;
+          }
+        } else {
+          if (c.vy >= 0) {
+            c.y = r.y + (r.height || 0) + rad + 1;
+          } else {
+            c.y = r.y - rad - 1;
+          }
+        }
+
+        if (c.onCollide) c.onCollide(r, 0);
+        return;
+      }
       
       // 简化处理：仅反弹圆，假设矩形是静态障碍物
       if (!c.isStatic) {
@@ -178,8 +212,9 @@ export class PhysicsEngine {
         
         // 简单的反射逻辑
         const dot = c.vx * nx + c.vy * ny;
-        c.vx -= 2 * dot * nx * c.restitution;
-        c.vy -= 2 * dot * ny * c.restitution;
+        const bounceMultiplier = this.consumeBounceBonus(c);
+        c.vx -= 2 * dot * nx * c.restitution * bounceMultiplier;
+        c.vy -= 2 * dot * ny * c.restitution * bounceMultiplier;
         
         if (c.onCollide) c.onCollide(r, Math.abs(dot * 2));
       }

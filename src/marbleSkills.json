@@ -1,0 +1,94 @@
+{
+   "comment": "弹珠赛前技能配置。每个技能都应贴合弹珠玩法，主要影响碰撞、穿障、反弹等规则；对局开始时读取一次，不在对局中实时变更。",
+   "defaultMarbleSkillIds": [
+     "wall_pass_once"
+   ],
+   "skills": {
+     "wall_pass_once": {
+       "name": "借道穿障",
+       "description": "本局可穿过障碍物1次，适合在复杂地形中寻找直线突破机会。",
+       "comment": "可穿墙1次",
+       "effects": {
+         "passThroughObstacleCount": 1
+       }
+     },
+     "double_ricochet": {
+       "name": "双重弹射",
+       "description": "本局前2次边界或障碍反弹会更强，更适合打折返线路。",
+       "comment": "可强化反弹2次",
+       "effects": {
+         "bonusBounceCount": 2,
+         "bonusBounceRestitution": 1.2
+       }
+     },
+     "wall_pass_and_bounce": {
+       "name": "穿障折返",
+       "description": "兼顾路线穿透与弹射，适合高风险高收益走位。",
+       "comment": "可穿墙1次，并强化反弹1次",
+       "effects": {
+         "passThroughObstacleCount": 1,
+         "bonusBounceCount": 1,
+         "bonusBounceRestitution": 1.25
+       }
+     },
+     "triple_ricochet": {
+       "name": "三段回弹",
+       "description": "本局前3次反弹获得增强，适合围绕边界连续借力。",
+       "comment": "可强化反弹3次",
+       "effects": {
+         "bonusBounceCount": 3,
+         "bonusBounceRestitution": 1.15
+       }
+     }
+   },
+   "marbleSkills": {
+     "basic_red": {
+       "marbleName": "赤焰珠",
+       "comment": "基础突破型弹珠，强调直线过障。",
+       "skillIds": [
+         "wall_pass_once"
+       ]
+     },
+     "ocean_blue": {
+       "marbleName": "深海珠",
+       "comment": "偏运营路线，适合借边回弹。",
+       "skillIds": [
+         "double_ricochet"
+       ]
+     },
+     "emerald_green": {
+       "marbleName": "翡翠珠",
+       "comment": "强调复杂地形中的折返路线。",
+       "skillIds": [
+         "wall_pass_and_bounce"
+       ]
+     },
+     "golden_sun": {
+       "marbleName": "金阳珠",
+       "comment": "擅长边界多段回弹，适合秀操作。",
+       "skillIds": [
+         "triple_ricochet"
+       ]
+     },
+     "purple_magic": {
+       "marbleName": "紫幻珠",
+       "comment": "更偏向灵活绕障打法。",
+       "skillIds": [
+         "wall_pass_and_bounce"
+       ]
+     },
+     "crystal_clear": {
+       "marbleName": "水晶珠",
+       "comment": "综合型弹珠，兼顾穿透与稳定回弹。",
+       "skillIds": [
+         "wall_pass_once",
+         "double_ricochet"
+       ]
+     },
+     "enemy_default": {
+       "marbleName": "敌方默认珠",
+       "comment": "默认不携带赛前技能。",
+       "skillIds": []
+     }
+   }
+ }

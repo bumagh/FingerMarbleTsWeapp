@@ -1,6 +1,7 @@
 // src/eventmanager.ts
 import { MenuSystem, MarbleType } from "./menu";
 import RetroMarbleGame from "./game";
+import DataBus from './databus';
 import { GameState, MenuState, Turn } from './GameStates';
 import GameStateManager from './GameStateManager';
 import GameEventHandler from './GameEventHandler';
@@ -24,6 +25,14 @@ export default class EventManager {
     // 初始化状态管理器和事件处理器
     this.gameStateManager = GameStateManager.getInstance();
     this.eventHandler = new GameEventHandler(canvas, menu);
+    
+    if (typeof (this.eventHandler as any).setButtonPositionCheckers === 'function') {
+      (this.eventHandler as any).setButtonPositionCheckers(
+        (x: number, y: number) => this.checkRestartButtonClick(x, y),
+        (x: number, y: number) => this.checkExitButtonClick(x, y),
+        (x: number, y: number) => this.checkSkillButtonClick(x, y)
+      );
+    }
     
     // 设置事件处理器的回调
     this.setupEventCallbacks();
@@ -76,12 +85,22 @@ export default class EventManager {
     // 弹珠相关回调
     this.eventHandler.onMarblePurchase = (marbleId: string) => {
       console.log(`弹珠购买: ${marbleId}`);
-      // 可以在这里添加弹珠购买逻辑
+      const marble = this.menu.marbleStore.find((item: MarbleType) => item.id === marbleId);
+      if (!marble || marble.unlocked) {
+        return;
+      }
+
+      if (DataBus.spendScore(marble.cost)) {
+        this.menu.unlockMarble(marbleId);
+        this.menu.setCurrentMarble(marbleId);
+        DataBus.setCurrentMarble(marbleId);
+      }
     };
 
     this.eventHandler.onMarbleSelect = (marbleId: string) => {
       console.log(`弹珠选择: ${marbleId}`);
-      // 可以在这里添加弹珠选择逻辑
+      DataBus.setCurrentMarble(marbleId);
+      DataBus.updatePlayerMarbleColor();
     };
 
     // 游戏结果回调
@@ -106,7 +125,7 @@ export default class EventManager {
 
     this.eventHandler.onSkillActivate = (skillId: string) => {
       console.log(`技能激活: ${skillId}`);
-      // 可以在这里添加技能激活逻辑
+      this.main.activateSkill(skillId);
     };
   }
 
@@ -125,33 +144,55 @@ export default class EventManager {
    */
   private handleExit(): void {
     console.log('退出游戏返回主菜单');
-    // 简化处理，直接设置菜单状态
-    this.gameStateManager.setMenuState(MenuState.MAIN);
-    this.gameStateManager.setGameState(GameState.MENU);
+    this.main.exitGame();
   }
 
   /**
    * 检查重新开始按钮点击
    */
   private checkRestartButtonClick(x: number, y: number): boolean {
-    // 暂时返回false，需要从main获取按钮位置
-    return false;
+    const buttonRect = this.main.getRestartButtonRect();
+    if (!buttonRect) return false;
+
+    return x >= buttonRect.x &&
+      x <= buttonRect.x + buttonRect.width &&
+      y >= buttonRect.y &&
+      y <= buttonRect.y + buttonRect.height;
   }
 
   /**
    * 检查退出按钮点击
    */
   private checkExitButtonClick(x: number, y: number): boolean {
-    // 暂时返回false，需要从main获取按钮位置
-    return false;
+    const buttonRect = this.main.getExitButtonRect();
+    if (!buttonRect) return false;
+
+    return x >= buttonRect.x &&
+      x <= buttonRect.x + buttonRect.width &&
+      y >= buttonRect.y &&
+      y <= buttonRect.y + buttonRect.height;
   }
 
   /**
    * 检查技能按钮点击
    */
   private checkSkillButtonClick(x: number, y: number): void {
-    console.log(`检查技能按钮点击: (${x}, ${y})`);
-    // 可以在这里添加技能按钮点击逻辑
+    const skillButtonRects = this.main.getSkillButtonRects();
+    if (!skillButtonRects || skillButtonRects.length === 0) return;
+
+    for (const buttonRect of skillButtonRects) {
+      if (
+        x >= buttonRect.x &&
+        x <= buttonRect.x + buttonRect.width &&
+        y >= buttonRect.y &&
+        y <= buttonRect.y + buttonRect.height
+      ) {
+        if (this.eventHandler.onSkillActivate) {
+          this.eventHandler.onSkillActivate(buttonRect.id);
+        }
+        break;
+      }
+    }
   }
 
   /**

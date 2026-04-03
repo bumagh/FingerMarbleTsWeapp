@@ -127,6 +127,52 @@ class RetroMarbleGame {
     });
   }
 
+  private isObstaclePlacementValid(x: number, y: number, width: number, height: number): boolean {
+    const padding = 6;
+
+    const overlapsBall = databus.balls.some(ball => {
+      const closestX = Math.max(x, Math.min(ball.x, x + width));
+      const closestY = Math.max(y, Math.min(ball.y, y + height));
+      const dx = ball.x - closestX;
+      const dy = ball.y - closestY;
+      const minDistance = ball.radius + padding;
+
+      return dx * dx + dy * dy < minDistance * minDistance;
+    });
+
+    if (overlapsBall) {
+      return false;
+    }
+
+    return !databus.obstacles.some(obstacle => {
+      const left = x - padding;
+      const right = x + width + padding;
+      const top = y - padding;
+      const bottom = y + height + padding;
+
+      const obstacleLeft = obstacle.x - padding;
+      const obstacleRight = obstacle.x + obstacle.width + padding;
+      const obstacleTop = obstacle.y - padding;
+      const obstacleBottom = obstacle.y + obstacle.height + padding;
+
+      return left < obstacleRight &&
+        right > obstacleLeft &&
+        top < obstacleBottom &&
+        bottom > obstacleTop;
+    });
+  }
+
+  private getSkillButtonColor(skillId: string): string {
+    const skillColors: { [key: string]: string } = {
+      wall_pass_once: '#8e44ad',
+      double_ricochet: '#2980b9',
+      wall_pass_and_bounce: '#16a085',
+      triple_ricochet: '#d35400'
+    };
+
+    return skillColors[skillId] || '#7f8c8d';
+  }
+
   public resetGame(): void {
     // 重置 DataBus
     databus.reset();
@@ -137,6 +183,7 @@ class RetroMarbleGame {
     // 重置游戏状态
     this.turn = Math.random() > 0.5 ? Turn.PLAYER : Turn.AI;
     this.turnTimer = databus.config.TURN_TIME;
+    this.skillManager.configureSkillsForMatch(databus.getCurrentMarble());
 
     // 创建玩家弹珠
     const playerBall = databus.createBall(
@@ -146,6 +193,7 @@ class RetroMarbleGame {
       'player',
       (other, force) => this.handleCollision('player', force)
     );
+    this.skillManager.applyMatchSkillsToBall(playerBall);
     databus.balls.push(playerBall);
 
     // 创建敌人弹珠
@@ -156,6 +204,8 @@ class RetroMarbleGame {
       'enemy',
       (other, force) => this.handleCollision('enemy', force)
     );
+    enemyBall.matchSkills = [];
+    enemyBall.skillNotes = [];
     databus.balls.push(enemyBall);
 
     // 创建障碍物
@@ -164,18 +214,20 @@ class RetroMarbleGame {
       const height = 40 + Math.random() * 60;
 
       // 避免与弹珠位置重叠
-      let x, y;
+      let x = 0;
+      let y = 0;
       let valid = false;
-      while (!valid) {
+      let attempts = 0;
+      while (!valid && attempts < 50) {
+        attempts++;
         x = 80 + Math.random() * (databus.config.WIDTH - 160);
         y = 100 + Math.random() * (databus.config.HEIGHT - 200);
 
-        const conflict = databus.balls.some(ball =>
-          Math.abs(x - ball.x) < (width / 2 + ball.radius) &&
-          Math.abs(y - ball.y) < (height / 2 + ball.radius)
-        );
+        valid = this.isObstaclePlacementValid(x, y, width, height);
+      }
 
-        if (!conflict) valid = true;
+      if (!valid) {
+        continue;
       }
 
       const obstacle = databus.createObstacle(
@@ -490,64 +542,46 @@ class RetroMarbleGame {
     }
   }
 
-  // 添加技能按钮渲染方法
+  // 赛前被动技能标签渲染
   private renderSkillButtons(): void {
-    const skillButtonSize = 60;
+    const skillButtonHeight = 44;
     const skillButtonSpacing = 10;
-    const skillButtonY = databus.config.HEIGHT - skillButtonSize - 20;
-    const skillButtons = [
-      { id: 'shockwave', name: '冲击波', color: '#e74c3c' },
-      { id: 'shield', name: '护盾', color: '#3498db' },
-      { id: 'teleport', name: '传送', color: '#9b59b6' },
-      { id: 'freeze', name: '冰冻', color: '#00bcd4' },
-      { id: 'speed', name: '加速', color: '#f39c12' }
-    ];
+    const skillButtonY = databus.config.HEIGHT - skillButtonHeight - 20;
+    const skillButtons = this.skillManager.getMatchSkills();
 
-    const totalWidth = skillButtons.length * skillButtonSize + (skillButtons.length - 1) * skillButtonSpacing;
-    const startX = (databus.config.WIDTH - totalWidth) / 2;
+    if (skillButtons.length === 0) {
+      this.skillButtonRects = [];
+      return;
+    }
 
     this.skillButtonRects = [];
+    let currentX = 20;
     
     skillButtons.forEach((skill, index) => {
-      const x = startX + index * (skillButtonSize + skillButtonSpacing);
+      const label = skill.comment || skill.name;
+      const width = Math.max(96, label.length * 14 + 24);
+      const x = currentX;
+      currentX += width + skillButtonSpacing;
       
-      // 检查技能是否在冷却中
-      const cooldown = this.skillManager.getCooldownRemaining(skill.id);
-      const isOnCooldown = cooldown > 0;
+      ctx.fillStyle = this.getSkillButtonColor(skill.id);
+      ctx.fillRect(x, skillButtonY, width, skillButtonHeight);
       
-      // 绘制按钮背景
-      ctx.fillStyle = isOnCooldown ? 'rgba(100, 100, 100, 0.8)' : skill.color;
-      ctx.fillRect(x, skillButtonY, skillButtonSize, skillButtonSize);
-      
-      // 绘制按钮边框
       ctx.strokeStyle = '#ecf0f1';
       ctx.lineWidth = 2;
-      ctx.strokeRect(x, skillButtonY, skillButtonSize, skillButtonSize);
+      ctx.strokeRect(x, skillButtonY, width, skillButtonHeight);
       
-      // 绘制技能名称
       ctx.fillStyle = '#ecf0f1';
       ctx.font = '12px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(skill.name, x + skillButtonSize / 2, skillButtonY + skillButtonSize / 2);
+      ctx.fillText(label, x + width / 2, skillButtonY + skillButtonHeight / 2);
       
-      // 如果在冷却中，显示冷却时间
-      if (isOnCooldown) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(x, skillButtonY, skillButtonSize, skillButtonSize);
-        
-        ctx.fillStyle = '#ecf0f1';
-        ctx.font = '16px Arial';
-        ctx.fillText(`${Math.ceil(cooldown)}s`, x + skillButtonSize / 2, skillButtonY + skillButtonSize / 2);
-      }
-      
-      // 存储按钮位置信息用于点击检测
       this.skillButtonRects.push({
         id: skill.id,
         x: x,
         y: skillButtonY,
-        width: skillButtonSize,
-        height: skillButtonSize
+        width: 0,
+        height: 0
       });
     });
   }
@@ -736,7 +770,7 @@ class RetroMarbleGame {
    */
   public exitGame(): void {
     this.state = GameState.MENU;
-    this.menuState = 'MAIN';
+    this.menuState = MenuState.MAIN;
     this.resetGame();
   }
 
@@ -748,8 +782,7 @@ class RetroMarbleGame {
       .then(() => {
         console.log('分享成功');
         ToastManager.success('分享成功！获得10积分奖励');
-        
-        // 获取分享奖励
+
         const reward = ShareManager.getShareReward();
         if (reward > 0) {
           databus.addScore(reward);

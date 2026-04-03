@@ -29,6 +29,15 @@ export interface GameBall
   onCollide?: ( other: any, force: number ) => void;
   
   // 技能相关属性
+  marbleId?: string;
+  matchSkills?: string[];
+  skillNotes?: string[];
+  mana?: number;
+  speedMultiplier?: number;
+  forceMultiplier?: number;
+  passThroughObstacleCount?: number;
+  bonusBounceCount?: number;
+  bonusBounceRestitution?: number;
   isFrozen?: boolean;
   frozenEndTime?: number;
   hasShield?: boolean;
@@ -419,6 +428,15 @@ class DataBus
     ball.finished = false;
     ball.finishTime = 0;
     ball.onCollide = onCollide;
+    ball.marbleId = type === 'player' ? this.currentMarble : 'enemy_default';
+    ball.matchSkills = [];
+    ball.skillNotes = [];
+    ball.mana = 0;
+    ball.speedMultiplier = 1;
+    ball.forceMultiplier = 1;
+    ball.passThroughObstacleCount = 0;
+    ball.bonusBounceCount = 0;
+    ball.bonusBounceRestitution = 1;
 
     return ball;
   }
