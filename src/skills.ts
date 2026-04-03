@@ -30,12 +30,7 @@ interface MarbleSkillLoadoutConfig {
   skillIds?: string[];
 }
 
-const marbleSkillConfig = require('./marbleSkills.json') as {
-  comment?: string;
-  defaultMarbleSkillIds?: string[];
-  skills?: { [key: string]: SkillDefinitionConfig };
-  marbleSkills?: { [key: string]: MarbleSkillLoadoutConfig };
-};
+import marbleSkillConfig from './marbleSkills.json';
 
 export interface Skill {
   id: string;
