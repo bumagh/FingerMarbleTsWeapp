@@ -218,6 +218,8 @@ export default class EventManager
         this.handleExit();
         return;
       }
+      // 检查是否点击了技能按钮
+      this.checkSkillButtonClick( x, y );
     }
   }
   // 添加处理重新开始的方法
@@ -260,6 +262,27 @@ export default class EventManager
       y >= buttonRect.y &&
       y <= buttonRect.y + buttonRect.height
     );
+  }
+  // 添加检查技能按钮点击的方法
+  private checkSkillButtonClick ( x: number, y: number ): void
+  {
+    const skillButtonRects = this.main.getSkillButtonRects();
+    if ( !skillButtonRects || skillButtonRects.length === 0 ) return;
+
+    for ( const buttonRect of skillButtonRects )
+    {
+      if (
+        x >= buttonRect.x &&
+        x <= buttonRect.x + buttonRect.width &&
+        y >= buttonRect.y &&
+        y <= buttonRect.y + buttonRect.height
+      )
+      {
+        console.log( `点击了技能按钮: ${buttonRect.id}` );
+        this.main.activateSkill( buttonRect.id );
+        break;
+      }
+    }
   }
   /**
    * 处理游戏中的触摸开始
