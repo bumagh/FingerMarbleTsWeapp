@@ -18,7 +18,8 @@ wx.onShow(function() {
 wx.onHide(function() {
   console.log('游戏暂停');
   if (game) {
-    // 可以在这里保存游戏状态
+    // 正确销毁游戏实例，清理事件监听器
+    game.destroy();
     game = null;
   }
 });

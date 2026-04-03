@@ -3,9 +3,8 @@ import { Vector } from "./physics";
 import { TextButton, TextButtonStyle, ButtonConfig } from "./ui/TextButton";
 import { ButtonManager } from "./ui/ButtonManager";
 import DataBus from './databus';
-
-// 扩展 MenuState 类型
-export type MenuState = 'MAIN' | 'HELP' | 'GAME_OVER' | 'SETTINGS' | 'STORE' | 'NONE';
+import ShareManager from './share';
+import { MenuState } from './GameStates';
 
 // 弹珠类型定义
 export interface MarbleType
@@ -557,6 +556,17 @@ export class MenuSystem
         onClick: () => {
           if ( this.onSettings ) this.onSettings();
         }
+      },
+      {
+        id: "share",
+        x: centerX,
+        y: startY + ( btnH + gap ) * 4,
+        width: btnW,
+        height: btnH,
+        text: "分享游戏",
+        onClick: () => {
+          this.shareGame();
+        }
       }
     ], buttonStyle);
   }
@@ -651,6 +661,28 @@ export class MenuSystem
       text,
       onClick
     } );
+  }
+
+  // --- 分享功能 ---
+
+  /**
+   * 分享游戏
+   */
+  private shareGame(): void {
+    const stats = DataBus.getGameStats();
+    ShareManager.shareGameStats(stats.totalGamesPlayed, stats.totalWins, stats.totalMarblesUnlocked)
+      .then(() => {
+        console.log('游戏统计分享成功');
+        
+        // 获取分享奖励
+        const reward = ShareManager.getShareReward();
+        if (reward > 0) {
+          DataBus.addScore(reward);
+        }
+      })
+      .catch((error) => {
+        console.error('分享失败:', error);
+      });
   }
 
   // --- 绘图辅助方法 ---

@@ -1,6 +1,6 @@
 // src/game.ts
-import { PhysicsBody, PhysicsEngine } from "./physics";
-import { MenuSystem, MenuState } from "./menu";
+import { Vector, PhysicsBody } from "./physics";
+import { PhysicsEngine } from "./physics";
 import DataBus, { GameBall, GameObstacle } from "./databus";
 import EventManager from "./eventmanager";
 import { getScreenInfo } from '../mytsglib/core/utils/screen/screenUtils'
@@ -9,15 +9,14 @@ import ShareManager from './share';
 import ToastManager from './toast';
 import ErrorHandler, { ErrorLevel } from './errorhandler';
 import { SkillManager } from './skills';
+import { GameState, MenuState, Turn, GameSubState, GameResult } from './GameStates';
+import { MenuSystem } from './menu';
+
 const canvas = wx.createCanvas();
 const ctx = canvas.getContext('2d');
 
 // 获取 DataBus 实例
 const databus = DataBus;
-
-// 游戏状态枚举
-enum GameState { MENU, PLAYING, AIMING, MOVING, SETTLING, GAME_OVER }
-enum Turn { PLAYER, AI }
 
 class RetroMarbleGame {
   private restartButtonRect: { x: number, y: number, width: number, height: number } | null = null;
@@ -26,6 +25,7 @@ class RetroMarbleGame {
   private state: GameState = GameState.MENU;
   private turn: Turn = Turn.PLAYER;
   private turnTimer: number = databus.config.TURN_TIME;
+  private animationId: number | null = null;
 
   private physics: PhysicsEngine;
   private menu: MenuSystem;
@@ -33,7 +33,7 @@ class RetroMarbleGame {
   private skillManager: SkillManager;
 
   // 添加菜单状态变量
-  private menuState: MenuState = 'MAIN';
+  private menuState: MenuState = MenuState.MAIN;
 
   constructor() {
     try {
@@ -43,7 +43,11 @@ class RetroMarbleGame {
       // 初始化 Toast 系统
       ToastManager.init(ctx, canvas);
       
-      // 初始化物理引擎
+      // 先获取真实屏幕尺寸并初始化配置
+      var info = getScreenInfo();
+      databus.initConfig(info.width, info.height);
+      
+      // 使用真实屏幕尺寸初始化物理引擎
       this.physics = new PhysicsEngine(databus.config.WIDTH, databus.config.HEIGHT);
       // 初始化菜单系统
       this.menu = new MenuSystem(ctx, canvas);
@@ -58,6 +62,9 @@ class RetroMarbleGame {
       // 初始化分享功能
       ShareManager;
       
+      // 监听屏幕尺寸变化
+      this.setupScreenResizeListener();
+      
       // 初始化游戏
       this.resetGame();
       this.gameLoop();
@@ -68,13 +75,65 @@ class RetroMarbleGame {
     }
   }
 
+  /**
+   * 销毁游戏实例，清理资源
+   */
+  public destroy(): void {
+    console.log('销毁游戏实例...');
+    
+    // 停止游戏循环
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
+    }
+    
+    // 销毁事件管理器
+    if (this.eventManager) {
+      this.eventManager.destroy();
+      this.eventManager = null;
+    }
+    
+    // 清理其他资源
+    this.physics = null;
+    this.menu = null;
+    this.skillManager = null;
+    
+    console.log('游戏实例销毁完成');
+  }
+
+  /**
+   * 更新物理引擎边界以匹配当前屏幕尺寸
+   */
+  public updatePhysicsBounds(): void {
+    if (this.physics) {
+      this.physics = new PhysicsEngine(databus.config.WIDTH, databus.config.HEIGHT);
+      console.log(`物理引擎边界已更新: ${databus.config.WIDTH}x${databus.config.HEIGHT}`);
+    }
+  }
+
+  /**
+   * 设置屏幕尺寸变化监听器
+   */
+  private setupScreenResizeListener(): void {
+    // 微信小游戏监听窗口变化
+    wx.onWindowResize?.((res) => {
+      console.log('屏幕尺寸变化:', res.windowWidth, res.windowHeight);
+      
+      // 更新配置
+      databus.initConfig(res.windowWidth, res.windowHeight);
+      
+      // 更新物理引擎边界
+      this.updatePhysicsBounds();
+    });
+  }
+
   public resetGame(): void {
     // 重置 DataBus
     databus.reset();
     var info = getScreenInfo();
     databus.initConfig(info.width, info.height);
     // 同步更新物理引擎边界
-    this.physics = new PhysicsEngine(databus.config.WIDTH, databus.config.HEIGHT);
+    this.updatePhysicsBounds();
     // 重置游戏状态
     this.turn = Math.random() > 0.5 ? Turn.PLAYER : Turn.AI;
     this.turnTimer = databus.config.TURN_TIME;
@@ -537,7 +596,7 @@ class RetroMarbleGame {
     this.update(dt);
     this.render();
 
-    requestAnimationFrame(this.gameLoop);
+    this.animationId = requestAnimationFrame(this.gameLoop);
   }
 
   /**
@@ -672,41 +731,119 @@ class RetroMarbleGame {
     return this.skillManager.activateSkill(skillId, playerBall, null, this);
   }
 
-  // 添加退出游戏的方法
+  /**
+   * 退出游戏
+   */
   public exitGame(): void {
     this.state = GameState.MENU;
     this.menuState = 'MAIN';
     this.resetGame();
   }
 
-  // 添加分享方法
+  /**
+   * 分享游戏成绩
+   */
   public shareScore(): void {
     ShareManager.shareScore(databus.score, databus.playerGrade)
       .then(() => {
         console.log('分享成功');
+        ToastManager.success('分享成功！获得10积分奖励');
+        
+        // 获取分享奖励
+        const reward = ShareManager.getShareReward();
+        if (reward > 0) {
+          databus.addScore(reward);
+        }
       })
-      .catch((error: any) => {
+      .catch((error) => {
         console.error('分享失败:', error);
+        ToastManager.error('分享失败');
       });
   }
 
+  /**
+   * 分享胜利
+   */
   public shareVictory(): void {
     ShareManager.shareVictory()
       .then(() => {
         console.log('胜利分享成功');
+        ToastManager.success('胜利分享成功！获得10积分奖励');
+        
+        // 获取分享奖励
+        const reward = ShareManager.getShareReward();
+        if (reward > 0) {
+          databus.addScore(reward);
+        }
       })
-      .catch((error: any) => {
-        console.error('胜利分享失败:', error);
+      .catch((error) => {
+        console.error('分享失败:', error);
+        ToastManager.error('分享失败');
       });
   }
 
+  /**
+   * 分享弹珠解锁
+   */
   public shareMarbleUnlock(marbleName: string): void {
     ShareManager.shareMarbleUnlock(marbleName)
       .then(() => {
         console.log('弹珠解锁分享成功');
+        ToastManager.success('弹珠解锁分享成功！获得10积分奖励');
+        
+        // 获取分享奖励
+        const reward = ShareManager.getShareReward();
+        if (reward > 0) {
+          databus.addScore(reward);
+        }
       })
-      .catch((error: any) => {
-        console.error('弹珠解锁分享失败:', error);
+      .catch((error) => {
+        console.error('分享失败:', error);
+        ToastManager.error('分享失败');
+      });
+  }
+
+  /**
+   * 分享最高分
+   */
+  public shareHighScore(): void {
+    const stats = databus.getGameStats();
+    ShareManager.shareHighScore(stats.highestScore, stats.winRate)
+      .then(() => {
+        console.log('最高分分享成功');
+        ToastManager.success('最高分分享成功！获得10积分奖励');
+        
+        // 获取分享奖励
+        const reward = ShareManager.getShareReward();
+        if (reward > 0) {
+          databus.addScore(reward);
+        }
+      })
+      .catch((error) => {
+        console.error('分享失败:', error);
+        ToastManager.error('分享失败');
+      });
+  }
+
+  /**
+   * 分享游戏统计
+   */
+  public shareGameStats(): void {
+    const stats = databus.getGameStats();
+    ShareManager.shareGameStats(stats.totalGamesPlayed, stats.totalWins, stats.totalMarblesUnlocked)
+      .then(() => {
+        console.log('游戏统计分享成功');
+        ToastManager.success('游戏统计分享成功！获得10积分奖励');
+        
+        // 获取分享奖励
+        const reward = ShareManager.getShareReward();
+        if (reward > 0) {
+          databus.addScore(reward);
+        }
+      })
+      .catch((error) => {
+        console.error('分享失败:', error);
+        ToastManager.error('分享失败');
       });
   }
 }

@@ -1,5 +1,8 @@
 // src/databus.ts
 
+import { Vector } from "./physics";
+import { GameSubState } from './GameStates';
+
 /**
  * 游戏状态管理器 - DataBus
  * 集中管理游戏状态、物理参数、游戏对象等数据
@@ -104,7 +107,7 @@ class DataBus
   private currentMarble: string = 'basic_red'; // 当前使用的弹珠ID
   public frame: number = 0;
   public score: number = 10; // 初始积分
-  public gameState: 'idle' | 'preview' | 'betting' | 'running' | 'paused' | 'finished' = 'idle';
+  public gameState: GameSubState = GameSubState.IDLE;
   public selectedBall: GameBall | null = null;
   public betAmount: number = 0;
   public lastClaimTime: number = 0;
@@ -128,6 +131,12 @@ class DataBus
   public playerExp: number = 0;
   public handSpan: number = 20; // "一扎"距离
   public maxForce: number = 18000;
+
+  // 游戏统计数据
+  public totalGamesPlayed: number = 0;
+  public totalWins: number = 0;
+  public totalLosses: number = 0;
+  public highestScore: number = 0;
 
   // 弹珠解锁状态管理
   private marbleUnlocks: { [key: string]: boolean } = {};
@@ -203,14 +212,40 @@ class DataBus
   {
     if ( typeof wx !== 'undefined' && wx.setStorageSync )
     {
+      // 基础游戏数据
       wx.setStorageSync( 'score', this.score );
       wx.setStorageSync( 'currentMarble', this.currentMarble );
       wx.setStorageSync( 'playerGrade', this.playerGrade );
       wx.setStorageSync( 'playerExp', this.playerExp );
-      // 保存弹珠解锁状态
+      
+      // 弹珠解锁状态
       wx.setStorageSync( 'marbleUnlocks', this.marbleUnlocks );
-      // 保存最后领取时间
+      
+      // 时间相关数据
       wx.setStorageSync( 'lastClaimTime', this.lastClaimTime );
+      
+      // 游戏设置和进度
+      wx.setStorageSync( 'gameSettings', {
+        gravity: this.gravity,
+        friction: this.friction,
+        bounceDamping: this.bounceDamping,
+        airResistance: this.airResistance,
+        handSpan: this.handSpan,
+        maxForce: this.maxForce,
+        claimCooldown: this.claimCooldown,
+        claimAmount: this.claimAmount
+      });
+      
+      // 统计数据
+      wx.setStorageSync( 'gameStats', {
+        totalGamesPlayed: this.totalGamesPlayed || 0,
+        totalWins: this.totalWins || 0,
+        totalLosses: this.totalLosses || 0,
+        highestScore: this.highestScore || 0,
+        totalMarblesUnlocked: Object.keys(this.marbleUnlocks).filter(key => this.marbleUnlocks[key]).length
+      });
+      
+      console.log('游戏数据已保存到本地存储');
     }
   }
 
@@ -254,6 +289,32 @@ class DataBus
       {
         this.marbleUnlocks = { ...marbleUnlocks };
       }
+
+      // 加载游戏设置
+      const gameSettings = wx.getStorageSync( 'gameSettings' );
+      if ( gameSettings !== undefined )
+      {
+        this.gravity = gameSettings.gravity || this.gravity;
+        this.friction = gameSettings.friction || this.friction;
+        this.bounceDamping = gameSettings.bounceDamping || this.bounceDamping;
+        this.airResistance = gameSettings.airResistance || this.airResistance;
+        this.handSpan = gameSettings.handSpan || this.handSpan;
+        this.maxForce = gameSettings.maxForce || this.maxForce;
+        this.claimCooldown = gameSettings.claimCooldown || this.claimCooldown;
+        this.claimAmount = gameSettings.claimAmount || this.claimAmount;
+      }
+
+      // 加载统计数据
+      const gameStats = wx.getStorageSync( 'gameStats' );
+      if ( gameStats !== undefined )
+      {
+        this.totalGamesPlayed = gameStats.totalGamesPlayed || 0;
+        this.totalWins = gameStats.totalWins || 0;
+        this.totalLosses = gameStats.totalLosses || 0;
+        this.highestScore = gameStats.highestScore || 0;
+      }
+
+      console.log('游戏数据已从本地存储加载');
     }
   }
   public static getInstance (): DataBus
@@ -279,7 +340,7 @@ class DataBus
   reset (): void
   {
     this.frame = 0;
-    this.gameState = 'idle';
+    this.gameState = GameSubState.IDLE;
     this.selectedBall = null;
     this.betAmount = 0;
     this.lastClaimTime = 0;
@@ -429,6 +490,61 @@ class DataBus
   getPlayerBall (): GameBall | undefined
   {
     return this.balls.find( ball => ball.isPlayer );
+  }
+
+  /**
+   * 更新最高分
+   */
+  public updateHighestScore(): void {
+    if (this.score > this.highestScore) {
+      this.highestScore = this.score;
+      this.saveToLocal();
+      console.log(`新最高分: ${this.highestScore}`);
+    }
+  }
+
+  /**
+   * 记录游戏结果
+   */
+  public recordGameResult(won: boolean): void {
+    this.totalGamesPlayed++;
+    if (won) {
+      this.totalWins++;
+    } else {
+      this.totalLosses++;
+    }
+    this.updateHighestScore();
+    this.saveToLocal();
+    console.log(`游戏结果记录 - 总场次: ${this.totalGamesPlayed}, 胜: ${this.totalWins}, 负: ${this.totalLosses}`);
+  }
+
+  /**
+   * 获取胜率
+   */
+  public getWinRate(): number {
+    if (this.totalGamesPlayed === 0) return 0;
+    return Math.round((this.totalWins / this.totalGamesPlayed) * 100);
+  }
+
+  /**
+   * 获取统计数据
+   */
+  public getGameStats(): {
+    totalGamesPlayed: number;
+    totalWins: number;
+    totalLosses: number;
+    highestScore: number;
+    winRate: number;
+    totalMarblesUnlocked: number;
+  } {
+    return {
+      totalGamesPlayed: this.totalGamesPlayed,
+      totalWins: this.totalWins,
+      totalLosses: this.totalLosses,
+      highestScore: this.highestScore,
+      winRate: this.getWinRate(),
+      totalMarblesUnlocked: Object.keys(this.marbleUnlocks).filter(key => this.marbleUnlocks[key]).length
+    };
   }
 
   /**

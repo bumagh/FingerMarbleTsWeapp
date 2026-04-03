@@ -1,562 +1,217 @@
 // src/eventmanager.ts
-import { Vector } from "./physics";
-import { MenuSystem, MenuState, MarbleType } from "./menu";
-import DataBus from './databus';
+import { MenuSystem, MarbleType } from "./menu";
 import RetroMarbleGame from "./game";
-// 游戏状态枚举
-enum GameState { MENU, PLAYING, AIMING, MOVING, SETTLING, GAME_OVER }
-enum Turn { PLAYER, AI }
+import { GameState, MenuState, Turn } from './GameStates';
+import GameStateManager from './GameStateManager';
+import GameEventHandler from './GameEventHandler';
+
 /**
- * 游戏事件管理器
- * 负责处理所有UI交互和游戏事件
+ * 游戏事件管理器（重构版）
+ * 现在作为 GameStateManager 和 GameEventHandler 的协调器
  */
-export default class EventManager
-{
+export default class EventManager {
   private main: RetroMarbleGame;
-  private databus: typeof DataBus;
   private menu: MenuSystem;
   private canvas: WechatMinigame.Canvas;
+  private eventHandler: GameEventHandler;
+  private gameStateManager: GameStateManager;
 
-  // 拖拽相关状态
-  private isDragging: boolean = false;
-  private dragStart: Vector | null = null;
-  private dragEnd: Vector | null = null;
-
-  constructor ( mainInstance: RetroMarbleGame, canvas: WechatMinigame.Canvas, menu: MenuSystem )
-  {
+  constructor(mainInstance: RetroMarbleGame, canvas: WechatMinigame.Canvas, menu: MenuSystem) {
     this.main = mainInstance;
-    this.databus = DataBus;
     this.menu = menu;
     this.canvas = canvas;
-
-    // 绑定方法的this上下文
-    this.handleTouchStart = this.handleTouchStart.bind( this );
-    this.handleTouchMove = this.handleTouchMove.bind( this );
-    this.handleTouchEnd = this.handleTouchEnd.bind( this );
+    
+    // 初始化状态管理器和事件处理器
+    this.gameStateManager = GameStateManager.getInstance();
+    this.eventHandler = new GameEventHandler(canvas, menu);
+    
+    // 设置事件处理器的回调
+    this.setupEventCallbacks();
   }
 
   /**
    * 初始化事件监听
    */
-  public init (): void
-  {
-    console.log( '事件管理器初始化...' );
-
-    // 绑定事件监听器
-    wx.onTouchStart( this.handleTouchStart );
-    wx.onTouchMove( this.handleTouchMove );
-    wx.onTouchEnd( this.handleTouchEnd );
-
-    // 设置菜单回调
-    this.setupMenuCallbacks();
-
-    console.log( '事件管理器初始化完成' );
+  public init(): void {
+    console.log('事件管理器初始化...');
+    
+    // 初始化事件处理器
+    this.eventHandler.init();
+    
+    console.log('事件管理器初始化完成');
   }
 
   /**
-   * 设置菜单回调
+   * 解绑事件监听器
    */
-  private setupMenuCallbacks (): void
-  {
-    this.menu.onStart = () =>
-    {
-      console.log( '开始游戏' );
-      this.main.setState( GameState.PLAYING );
+  public destroy(): void {
+    console.log('事件管理器销毁...');
+    
+    // 销毁事件处理器
+    this.eventHandler.destroy();
+    
+    console.log('事件管理器销毁完成');
+  }
+
+  /**
+   * 设置事件回调
+   */
+  private setupEventCallbacks(): void {
+    // 游戏控制回调 - 直接调用main的方法
+    this.eventHandler.onStart = () => {
       this.main.resetGame();
-      this.main.setMenuState( 'NONE' );
     };
 
-    this.menu.onRestart = () =>
-    {
-      console.log( '重新开始' );
-      this.main.setState( GameState.PLAYING );
+    this.eventHandler.onRestart = () => {
       this.main.resetGame();
       this.menu.showMainMenu();
     };
 
-    this.menu.onHelp = () =>
-    {
-      console.log( '显示帮助' );
-      this.menu.showHelpMenu();
-      this.main.setMenuState( 'HELP' );
-    };
-    this.menu.onStore = () =>
-    {
-      console.log( '显示商店' );
-      this.menu.showStore();
-      this.main.setMenuState( 'STORE' );
-    };
-    this.menu.onSettings = () =>
-    {
-      console.log( '显示设置' );
-      this.menu.showSettings();
-      this.main.setMenuState( 'SETTINGS' );
-    };
-    this.menu.onBackToMenu = () =>
-    {
-      console.log( '返回主菜单' );
-      this.menu.showMainMenu();
-      this.main.setMenuState( 'MAIN' );
-    };
-    // 新增设置变更回调
-    this.menu.onSettingChange = ( id: string, value: any ) =>
-    {
-      console.log( `设置变更: ${ id } = ${ value }` );
-      // 根据设置ID执行相应操作
-      switch ( id )
-      {
-        case 'sound':
-          // 控制音效
-          break;
-        case 'music':
-          // 控制音乐
-          break;
-        case 'vibration':
-          // 控制震动
-          break;
-        case 'difficulty':
-          // 调整难度
-          this.adjustDifficulty( value );
-          break;
-        case 'aim_assist':
-          // 瞄准辅助
-          break;
-        case 'particle':
-          // 粒子效果
-          break;
-      }
+    // 设置变更回调
+    this.eventHandler.onSettingChange = (id: string, value: any) => {
+      console.log(`设置变更: ${id} = ${value}`);
+      // 可以在这里添加设置处理逻辑
     };
 
-    // 新增弹珠购买回调
-    this.menu.onMarblePurchase = ( marbleId: string ) =>
-    {
-      console.log( `尝试购买弹珠: ${ marbleId }` );
-      const marble = this.getMarbleInfo( marbleId );
-      if ( marble && !marble.unlocked )
-      {
-        if ( this.databus.spendScore( marble.cost ) )
-        {
-          // 解锁弹珠
-          this.menu.unlockMarble( marbleId );
-          // 自动选择新弹珠
-          this.menu.setCurrentMarble( marbleId );
-          this.databus.setCurrentMarble( marbleId );
-          console.log( `成功解锁弹珠: ${ marble.name }` );
-        } else
-        {
-          console.log( `积分不足，无法购买: ${ marble.name }` );
-        }
-      }
+    // 弹珠相关回调
+    this.eventHandler.onMarblePurchase = (marbleId: string) => {
+      console.log(`弹珠购买: ${marbleId}`);
+      // 可以在这里添加弹珠购买逻辑
     };
 
-    // 新增弹珠选择回调
-    this.menu.onMarbleSelect = ( marbleId: string ) =>
-    {
-      console.log( `选择弹珠: ${ marbleId }` );
-      this.databus.setCurrentMarble( marbleId );
-      // 立即更新游戏中的弹珠颜色
-      this.databus.updatePlayerMarbleColor();
-      console.log( `弹珠皮肤已应用到游戏中` );
+    this.eventHandler.onMarbleSelect = (marbleId: string) => {
+      console.log(`弹珠选择: ${marbleId}`);
+      // 可以在这里添加弹珠选择逻辑
+    };
+
+    // 游戏结果回调
+    this.eventHandler.onGameWin = () => {
+      console.log('游戏胜利');
+      // 可以在这里添加胜利处理逻辑
+    };
+
+    this.eventHandler.onGameLose = () => {
+      console.log('游戏失败');
+      // 可以在这里添加失败处理逻辑
+    };
+
+    // 按钮点击回调
+    this.eventHandler.onRestartClick = () => {
+      this.handleRestart();
+    };
+
+    this.eventHandler.onExitClick = () => {
+      this.handleExit();
+    };
+
+    this.eventHandler.onSkillActivate = (skillId: string) => {
+      console.log(`技能激活: ${skillId}`);
+      // 可以在这里添加技能激活逻辑
     };
   }
-  // 辅助方法：获取弹珠信息
-  private getMarbleInfo ( marbleId: string ): MarbleType | undefined
-  {
-    return this.menu.marbleStore.find( ( e ) => e.id === marbleId );
-  }
-  // 调整游戏难度
-  private adjustDifficulty ( level: string ): void
-  {
-    switch ( level )
-    {
-      case '简单':
-        // 设置简单难度参数
-        break;
-      case '中等':
-        // 设置中等难度参数
-        break;
-      case '困难':
-        // 设置困难难度参数
-        break;
-    }
-  }
+
   /**
-   * 处理触摸开始事件
+   * 处理重新开始
    */
-  private handleTouchStart ( e: any ): void
-  {
-    const touch = e.touches[ 0 ];
-    const x = touch.clientX;
-    const y = touch.clientY;
-    console.log( `触摸点坐标: (${ x }, ${ y })` );
-    // 获取当前游戏状态
-    const gameState = this.main.getState();
-    const menuState = this.main.getMenuState();
-
-    // 如果处于菜单状态，将事件传递给菜单系统
-    if ( menuState === 'MAIN' || menuState === 'HELP' ||
-      menuState === 'GAME_OVER' || menuState === 'SETTINGS' ||
-      menuState === 'STORE' )
-    {
-      const handled = this.menu.handleInput( x, y, menuState );
-      if ( handled ) return;
-    }
-
-    // 处理游戏中的触摸事件
-    if ( gameState === GameState.PLAYING || gameState === GameState.AIMING )
-    {
-      this.handleGameTouchStart( x, y );
-      // 检查是否点击了重新开始按钮
-      if ( this.checkRestartButtonClick( x, y ) )
-      {
-        console.log( '点击了重新开始按钮' );
-        this.handleRestart();
-        return;
-      }
-      // 检查是否点击了退出按钮
-      if ( this.checkExitButtonClick( x, y ) )
-      {
-        console.log( '点击了退出按钮' );
-        this.handleExit();
-        return;
-      }
-      // 检查是否点击了技能按钮
-      this.checkSkillButtonClick( x, y );
-    }
-  }
-  // 添加处理重新开始的方法
-  private handleRestart (): void
-  {
-    console.log( '重新开始游戏' );
-    this.main.setState( GameState.PLAYING );
+  private handleRestart(): void {
+    console.log('重新开始游戏');
+    this.gameStateManager.setGameState(GameState.PLAYING);
     this.main.resetGame();
-    this.main.setMenuState( 'NONE' );
-  }
-  // 添加处理退出的方法
-  private handleExit (): void
-  {
-    console.log( '退出游戏返回主菜单' );
-    this.main.exitGame();
-  }
-  // 添加检查重新开始按钮点击的方法
-  private checkRestartButtonClick ( x: number, y: number ): boolean
-  {
-    // 需要从 main 获取按钮位置信息
-    const buttonRect = this.main.getRestartButtonRect();
-    if ( !buttonRect ) return false;
-
-    return (
-      x >= buttonRect.x &&
-      x <= buttonRect.x + buttonRect.width &&
-      y >= buttonRect.y &&
-      y <= buttonRect.y + buttonRect.height
-    );
-  }
-  // 添加检查退出按钮点击的方法
-  private checkExitButtonClick ( x: number, y: number ): boolean
-  {
-    const buttonRect = this.main.getExitButtonRect();
-    if ( !buttonRect ) return false;
-
-    return (
-      x >= buttonRect.x &&
-      x <= buttonRect.x + buttonRect.width &&
-      y >= buttonRect.y &&
-      y <= buttonRect.y + buttonRect.height
-    );
-  }
-  // 添加检查技能按钮点击的方法
-  private checkSkillButtonClick ( x: number, y: number ): void
-  {
-    const skillButtonRects = this.main.getSkillButtonRects();
-    if ( !skillButtonRects || skillButtonRects.length === 0 ) return;
-
-    for ( const buttonRect of skillButtonRects )
-    {
-      if (
-        x >= buttonRect.x &&
-        x <= buttonRect.x + buttonRect.width &&
-        y >= buttonRect.y &&
-        y <= buttonRect.y + buttonRect.height
-      )
-      {
-        console.log( `点击了技能按钮: ${buttonRect.id}` );
-        this.main.activateSkill( buttonRect.id );
-        break;
-      }
-    }
-  }
-  /**
-   * 处理游戏中的触摸开始
-   */
-  private handleGameTouchStart ( x: number, y: number ): void
-  {
-    const gameState = this.main.getState();
-    const turn = this.main.getTurn();
-
-    // 只有在玩家回合且游戏进行中时才能拖拽
-    if ( ( gameState !== GameState.AIMING && gameState !== GameState.PLAYING ) || turn !== Turn.PLAYER ) return;
-
-    const player = this.databus.getPlayerBall();
-    if ( !player ) return;
-
-    // 检查是否点击了玩家弹珠
-    const dist = Math.sqrt( ( x - player.x ) ** 2 + ( y - player.y ) ** 2 );
-    if ( dist < player.radius * 2 )
-    {
-      this.isDragging = true;
-      this.dragStart = { x: player.x, y: player.y };
-      this.dragEnd = { x, y };
-
-      // 切换到瞄准状态
-      this.main.setState( GameState.AIMING );
-    }
+    this.gameStateManager.setMenuState(MenuState.NONE);
   }
 
   /**
-   * 处理触摸移动事件
+   * 处理退出
    */
-  private handleTouchMove ( e: any ): void
-  {
-    if ( !this.isDragging ) return;
-
-    const touch = e.touches[ 0 ];
-    this.dragEnd = { x: touch.clientX, y: touch.clientY };
+  private handleExit(): void {
+    console.log('退出游戏返回主菜单');
+    // 简化处理，直接设置菜单状态
+    this.gameStateManager.setMenuState(MenuState.MAIN);
+    this.gameStateManager.setGameState(GameState.MENU);
   }
 
   /**
-   * 处理触摸结束事件
+   * 检查重新开始按钮点击
    */
-  private handleTouchEnd (): void
-  {
-    if ( !this.isDragging ) return;
-
-    this.handleGameTouchEnd();
-    this.resetDragState();
+  private checkRestartButtonClick(x: number, y: number): boolean {
+    // 暂时返回false，需要从main获取按钮位置
+    return false;
   }
 
   /**
-   * 处理游戏中的触摸结束
+   * 检查退出按钮点击
    */
-  private handleGameTouchEnd (): void
-  {
-    if ( !this.dragStart || !this.dragEnd ) return;
-
-    const player = this.databus.getPlayerBall();
-    if ( !player ) return;
-
-    // 计算拖拽方向和力量
-    const dx = this.dragStart.x - this.dragEnd.x;
-    const dy = this.dragStart.y - this.dragEnd.y;
-    const dist = Math.sqrt( dx * dx + dy * dy );
-
-    // 如果拖拽距离足够大，则发射弹珠
-    if ( dist > 15 )
-    {
-      const power = Math.min( dist, 900 ) / 900;
-      const force = power * this.databus.maxForce;
-      const angle = Math.atan2( dy, dx );
-
-      // 应用力量到弹珠
-      player.vx = Math.cos( angle ) * force * 0.5;
-      player.vy = Math.sin( angle ) * force * 0.5;
-
-      // 记录发射信息用于调试
-      console.log( `发射弹珠: 力量=${force.toFixed(1)}, 角度=${(angle * 180 / Math.PI).toFixed(1)}°` );
-
-      // 切换到移动状态并重置回合计时器
-      this.main.setState( GameState.MOVING );
-      this.main.resetTurnTimer();
-    } else {
-      // 拖拽距离太小，返回游戏状态
-      this.main.setState( GameState.PLAYING );
-      console.log( '拖拽距离太小，取消发射' );
-    }
+  private checkExitButtonClick(x: number, y: number): boolean {
+    // 暂时返回false，需要从main获取按钮位置
+    return false;
   }
 
   /**
-   * 重置拖拽状态
+   * 检查技能按钮点击
    */
-  private resetDragState (): void
-  {
-    this.isDragging = false;
-    this.dragStart = null;
-    this.dragEnd = null;
+  private checkSkillButtonClick(x: number, y: number): void {
+    console.log(`检查技能按钮点击: (${x}, ${y})`);
+    // 可以在这里添加技能按钮点击逻辑
   }
 
   /**
-   * 获取拖拽状态（用于渲染）
+   * 获取游戏状态管理器
    */
-  public getDragState ():
-    {
-      isDragging: boolean;
-      dragStart: Vector | null;
-      dragEnd: Vector | null;
-    }
-  {
-    return {
-      isDragging: this.isDragging,
-      dragStart: this.dragStart,
-      dragEnd: this.dragEnd
-    };
+  public getGameStateManager(): GameStateManager {
+    return this.gameStateManager;
   }
 
   /**
-   * 处理AI回合
+   * 获取事件处理器
    */
-  public executeAITurn (): void
-  {
-    const enemy = this.databus.getEnemyBall();
-    const player = this.databus.getPlayerBall();
-
-    if ( !enemy || !player ) return;
-
-    // 计算到玩家弹珠的方向和距离
-    const dx = player.x - enemy.x;
-    const dy = player.y - enemy.y;
-    const dist = Math.sqrt( dx * dx + dy * dy );
-
-    // 根据难度等级调整AI精度
-    const difficulty = this.getAIDifficulty();
-    let error = 0;
-    let forceMultiplier = 1;
-
-    switch ( difficulty ) {
-      case 'easy':
-        error = ( Math.random() - 0.5 ) * 0.6; // 较大误差
-        forceMultiplier = 0.8; // 力量较小
-        break;
-      case 'medium':
-        error = ( Math.random() - 0.5 ) * 0.3; // 中等误差
-        forceMultiplier = 1.0; // 标准力量
-        break;
-      case 'hard':
-        error = ( Math.random() - 0.5 ) * 0.15; // 较小误差
-        forceMultiplier = 1.2; // 力量较大
-        break;
-    }
-
-    // 计算基础发射力量
-    const baseForce = Math.min( 600, dist * 1.5 ) * forceMultiplier;
-    const angle = Math.atan2( dy, dx );
-
-    // 添加智能预测 - 预测玩家可能的位置
-    const predictedPlayerPos = this.predictPlayerPosition( player, enemy );
-    const predictedDx = predictedPlayerPos.x - enemy.x;
-    const predictedDy = predictedPlayerPos.y - enemy.y;
-    const predictedAngle = Math.atan2( predictedDy, predictedDy );
-
-    // 混合使用直接瞄准和预测瞄准
-    const finalAngle = angle * 0.7 + predictedAngle * 0.3 + error;
-
-    // 应用力量到敌人弹珠
-    enemy.vx = Math.cos( finalAngle ) * baseForce * 0.5;
-    enemy.vy = Math.sin( finalAngle ) * baseForce * 0.5;
-
-    // 记录AI决策信息
-    console.log( `AI发射: 难度=${difficulty}, 力量=${baseForce.toFixed(1)}, 角度=${(finalAngle * 180 / Math.PI).toFixed(1)}°` );
-
-    // 切换到移动状态并重置回合计时器
-    this.main.setState( GameState.MOVING );
-    this.main.resetTurnTimer();
+  public getEventHandler(): GameEventHandler {
+    return this.eventHandler;
   }
 
-  /**
-   * 获取AI难度等级
-   */
-  private getAIDifficulty (): string {
-    // 可以根据玩家等级或游戏设置返回不同难度
-    if ( this.databus.playerGrade < 3 ) return 'easy';
-    if ( this.databus.playerGrade < 6 ) return 'medium';
-    return 'hard';
+  // === 向后兼容的方法 ===
+  // 这些方法保持向后兼容，内部委托给 GameStateManager
+
+  public getGameState(): GameState {
+    return this.gameStateManager.getGameState();
   }
 
-  /**
-   * 预测玩家位置
-   */
-  private predictPlayerPosition ( player: any, enemy: any ): { x: number; y: number } {
-    // 简单的位置预测 - 基于当前速度和方向
-    const predictionTime = 0.5; // 预测0.5秒后的位置
-    const predictedX = player.x + player.vx * predictionTime * 10;
-    const predictedY = player.y + player.vy * predictionTime * 10;
-
-    // 确保预测位置在游戏边界内
-    const boundedX = Math.max( player.radius, Math.min( this.databus.config.WIDTH - player.radius, predictedX ) );
-    const boundedY = Math.max( player.radius, Math.min( this.databus.config.HEIGHT - player.radius, predictedY ) );
-
-    return { x: boundedX, y: boundedY };
+  public setGameState(state: GameState): void {
+    this.gameStateManager.setGameState(state);
   }
 
-  /**
-   * 处理胜利
-   */
-  public handleWin (): void
-  {
-    this.databus.addExp( 20 );
-    const scoreGained = 20; // 胜利获得20积分
-    this.databus.addScore( scoreGained );
-    this.main.setMenuState( 'GAME_OVER' );
-    this.menu.showGameOver( true, `捕获成功！经验+20 (等级${ this.databus.playerGrade })` );
+  public getMenuState(): MenuState {
+    return this.gameStateManager.getMenuState();
   }
 
-  /**
-   * 处理失败
-   */
-  public handleLose (): void
-  {
-    this.main.setMenuState( 'GAME_OVER' );
-    this.menu.showGameOver( false, "你的弹珠被捕获了！" );
+  public setMenuState(state: MenuState): void {
+    this.gameStateManager.setMenuState(state);
   }
 
-  /**
-   * 切换暂停/继续
-   */
-  public togglePause (): void
-  {
-    const gameState = this.main.getState();
-    const menuState = this.main.getMenuState();
-
-    if ( gameState === GameState.PLAYING || gameState === GameState.MOVING || gameState === GameState.SETTLING )
-    {
-      this.main.setMenuState( 'MAIN' );
-      this.main.setState( GameState.MENU );
-    } else if ( menuState === 'MAIN' && gameState === GameState.MENU )
-    {
-      this.main.setMenuState( 'NONE' );
-      this.main.setState( GameState.PLAYING );
-    }
+  public getTurn(): Turn {
+    return this.gameStateManager.getTurn();
   }
 
-  /**
-   * 处理游戏回合结算
-   */
-  public settleRound (): void
-  {
-    const player = this.databus.getPlayerBall();
-    const enemy = this.databus.getEnemyBall();
+  public switchTurn(): void {
+    this.gameStateManager.switchTurn();
+  }
 
-    if ( !player || !enemy ) return;
+  public resetTurnTimer(): void {
+    this.gameStateManager.resetTurnTimer();
+  }
 
-    // 检查是否在"一扎"距离内
-    const physics = this.main.getPhysicsEngine();
-    const isCaptured = physics.checkDistance( player, enemy, this.databus.handSpan );
+  public getBalls(): any[] {
+    return this.gameStateManager.getBalls();
+  }
 
-    if ( isCaptured )
-    {
-      const turn = this.main.getTurn();
-      if ( turn === Turn.PLAYER )
-      {
-        this.handleWin();
-      } else
-      {
-        this.handleLose();
-      }
-    } else
-    {
-      // 切换回合
-      this.main.switchTurn();
-      this.main.setState( GameState.PLAYING );
-      this.main.resetTurnTimer();
-    }
+  public getPlayerBall(): any {
+    return this.gameStateManager.getPlayerBall();
+  }
+
+  public getEnemyBall(): any {
+    return this.gameStateManager.getEnemyBall();
+  }
+
+  public getObstacles(): any[] {
+    return this.gameStateManager.getObstacles();
   }
 }
