@@ -87,53 +87,69 @@ export default class GameEventHandler {
 
     console.log(`[触摸事件] 游戏状态: ${gameState}, 菜单状态: ${menuState}`);
 
+    // 如果处于菜单状态，就将事件传递给菜单系统
     if (this.isMenuState(menuState)) {
-      // 处理菜单点击
-      console.log(`[触摸事件] 处理菜单点击`);
-      this.menu.handleInput(x, y, menuState);
-    } else if (this.isGameplayState(gameState)) {
-      // 处理游戏中的点击 - 包括按钮和拖拽
-      console.log(`[触摸事件] 处理游戏中的点击`);
-      
-      // 首先检查是否点击了游戏中的按钮
-      const buttonHandled = this.checkGameButtons(x, y);
-      if (!buttonHandled) {
-        // 如果没有点击按钮，则处理拖拽
-        if (this.canPlayerDrag(gameState, gameStateManager.getTurn())) {
-          this.startDrag(x, y);
-        }
-      }
+      const handled = this.menu.handleInput(x, y, menuState);
+      if (handled) return;
+    }
+
+    // 处理游戏中的触摸事件
+    if (this.isGameplayState(gameState)) {
+      this.handleGameTouchStart(x, y);
     }
   }
 
   /**
-   * 检查游戏中的按钮点击
+   * 处理游戏中的触摸事件
    */
-  private checkGameButtons(x: number, y: number): boolean {
+  private handleGameTouchStart(x: number, y: number): void {
+    // 检查重新开始按钮点击
+    if (this.checkRestartButtonClick(x, y)) {
+      console.log('点击了重新开始按钮');
+      if (this.onRestartClick) this.onRestartClick();
+      return;
+    }
+
+    // 检查退出按钮点击
+    if (this.checkExitButtonClick(x, y)) {
+      console.log('点击了退出按钮');
+      if (this.onExitClick) this.onExitClick();
+      return;
+    }
+
     // 检查技能按钮点击
     this.checkSkillButtonClick(x, y);
-    
-    // 检查重新开始按钮
-    const restartRect = this.main.getRestartButtonRect();
-    if (restartRect && 
-        x >= restartRect.x && x <= restartRect.x + restartRect.width &&
-        y >= restartRect.y && y <= restartRect.y + restartRect.height) {
-      console.log('[游戏按钮] 点击重新开始按钮');
-      if (this.onRestartClick) this.onRestartClick();
-      return true;
+
+    // 处理拖拽
+    if (this.canPlayerDrag(gameStateManager.getGameState(), gameStateManager.getTurn())) {
+      this.startDrag(x, y);
     }
-    
-    // 检查退出按钮
-    const exitRect = this.main.getExitButtonRect();
-    if (exitRect && 
-        x >= exitRect.x && x <= exitRect.x + exitRect.width &&
-        y >= exitRect.y && y <= exitRect.y + exitRect.height) {
-      console.log('[游戏按钮] 点击退出按钮');
-      if (this.onExitClick) this.onExitClick();
-      return true;
-    }
-    
-    return false; // 没有处理按钮点击
+  }
+
+  /**
+   * 检查重新开始按钮点击
+   */
+  private checkRestartButtonClick(x: number, y: number): boolean {
+    const buttonRect = this.main.getRestartButtonRect();
+    if (!buttonRect) return false;
+
+    return x >= buttonRect.x &&
+      x <= buttonRect.x + buttonRect.width &&
+      y >= buttonRect.y &&
+      y <= buttonRect.y + buttonRect.height;
+  }
+
+  /**
+   * 检查退出按钮点击
+   */
+  private checkExitButtonClick(x: number, y: number): boolean {
+    const buttonRect = this.main.getExitButtonRect();
+    if (!buttonRect) return false;
+
+    return x >= buttonRect.x &&
+      x <= buttonRect.x + buttonRect.width &&
+      y >= buttonRect.y &&
+      y <= buttonRect.y + buttonRect.height;
   }
 
   /**
