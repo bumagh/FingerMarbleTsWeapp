@@ -30,7 +30,7 @@ interface MarbleSkillLoadoutConfig {
   skillIds?: string[];
 }
 
-import marbleSkillConfig from './marbleSkills.json';
+import marbleSkillConfig from './marbleSkills';
 
 export interface Skill {
   id: string;
