@@ -4,6 +4,7 @@ import { GameState, MenuState, Turn } from './GameStates';
 import { MenuSystem, MarbleType } from './menu';
 import GameStateManager from './GameStateManager';
 import { GameBall, GameObstacle } from './databus';
+import RetroMarbleGame from './game';
 
 // 创建全局实例
 const gameStateManager = GameStateManager.getInstance();
@@ -15,6 +16,7 @@ const gameStateManager = GameStateManager.getInstance();
 export default class GameEventHandler {
   private menu: MenuSystem;
   private canvas: WechatMinigame.Canvas;
+  private main: RetroMarbleGame;
 
   // 拖拽相关状态
   private isDragging: boolean = false;
@@ -36,9 +38,10 @@ export default class GameEventHandler {
   public onSettingChange?: (id: string, value: any) => void;
   public onMarblePurchase?: (marbleId: string) => void;
 
-  constructor(canvas: WechatMinigame.Canvas, menu: MenuSystem) {
+  constructor(canvas: WechatMinigame.Canvas, menu: MenuSystem, main: RetroMarbleGame) {
     this.canvas = canvas;
     this.menu = menu;
+    this.main = main;
     
     // 设置事件监听器
     this.setupEventListeners();
@@ -77,18 +80,60 @@ export default class GameEventHandler {
     const x = touch.clientX;
     const y = touch.clientY;
 
+    console.log(`[触摸事件] 坐标: (${x}, ${y})`);
+
     const gameState = gameStateManager.getGameState();
     const menuState = gameStateManager.getMenuState();
 
+    console.log(`[触摸事件] 游戏状态: ${gameState}, 菜单状态: ${menuState}`);
+
     if (this.isMenuState(menuState)) {
       // 处理菜单点击
+      console.log(`[触摸事件] 处理菜单点击`);
       this.menu.handleInput(x, y, menuState);
     } else if (this.isGameplayState(gameState)) {
-      // 处理游戏中的拖拽
-      if (this.canPlayerDrag(gameState, gameStateManager.getTurn())) {
-        this.startDrag(x, y);
+      // 处理游戏中的点击 - 包括按钮和拖拽
+      console.log(`[触摸事件] 处理游戏中的点击`);
+      
+      // 首先检查是否点击了游戏中的按钮
+      const buttonHandled = this.checkGameButtons(x, y);
+      if (!buttonHandled) {
+        // 如果没有点击按钮，则处理拖拽
+        if (this.canPlayerDrag(gameState, gameStateManager.getTurn())) {
+          this.startDrag(x, y);
+        }
       }
     }
+  }
+
+  /**
+   * 检查游戏中的按钮点击
+   */
+  private checkGameButtons(x: number, y: number): boolean {
+    // 检查技能按钮点击
+    this.checkSkillButtonClick(x, y);
+    
+    // 检查重新开始按钮
+    const restartRect = this.main.getRestartButtonRect();
+    if (restartRect && 
+        x >= restartRect.x && x <= restartRect.x + restartRect.width &&
+        y >= restartRect.y && y <= restartRect.y + restartRect.height) {
+      console.log('[游戏按钮] 点击重新开始按钮');
+      if (this.onRestartClick) this.onRestartClick();
+      return true;
+    }
+    
+    // 检查退出按钮
+    const exitRect = this.main.getExitButtonRect();
+    if (exitRect && 
+        x >= exitRect.x && x <= exitRect.x + exitRect.width &&
+        y >= exitRect.y && y <= exitRect.y + exitRect.height) {
+      console.log('[游戏按钮] 点击退出按钮');
+      if (this.onExitClick) this.onExitClick();
+      return true;
+    }
+    
+    return false; // 没有处理按钮点击
   }
 
   /**

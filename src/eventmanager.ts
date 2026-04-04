@@ -24,7 +24,7 @@ export default class EventManager {
     
     // 初始化状态管理器和事件处理器
     this.gameStateManager = GameStateManager.getInstance();
-    this.eventHandler = new GameEventHandler(canvas, menu);
+    this.eventHandler = new GameEventHandler(canvas, menu, mainInstance);
     
     if (typeof (this.eventHandler as any).setButtonPositionCheckers === 'function') {
       (this.eventHandler as any).setButtonPositionCheckers(
