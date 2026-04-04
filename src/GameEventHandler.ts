@@ -81,8 +81,8 @@ export default class GameEventHandler {
     const menuState = gameStateManager.getMenuState();
 
     if (this.isMenuState(menuState)) {
-      // 处理菜单点击 - 暂时跳过，因为MenuSystem可能没有handleClick方法
-      // this.menu.handleClick(x, y);
+      // 处理菜单点击
+      this.menu.handleInput(x, y, menuState);
     } else if (this.isGameplayState(gameState)) {
       // 处理游戏中的拖拽
       if (this.canPlayerDrag(gameState, gameStateManager.getTurn())) {
